@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 KEEP_FRAMES = 16
 # Zellen im 256er-Raster, ab denen zwei Masken als berührend gelten.
 CONTACT_CELLS = 2
+REF_AREA_RATE = 0.05
 
 
 def pick_device() -> tuple[str, str]:
@@ -42,20 +43,13 @@ def descriptor(feats: torch.Tensor, low_res: np.ndarray) -> np.ndarray | None:
     return vec / (np.linalg.norm(vec) + 1e-6)
 
 
-def _uniform_scores(use_mask_as_output):
-    """Maskeneingabe liefert die Objekt-Wertung eine Dimension flacher als normales Tracking.
-
-    Transformers stolpert sonst, wenn ein neuer Roboter auf einem Bild angelegt wird, auf dem der
-    andere schon verfolgt wird (torch.cat in EdgeTamVideoModel.forward).
-    """
-
-    def wrapped(*args, **kwargs):
-        out = use_mask_as_output(*args, **kwargs)
-        if out.object_score_logits.dim() == 2:
-            out.object_score_logits = out.object_score_logits[..., None]
-        return out
-
-    return wrapped
+def _cached(cls, model_id: str):
+    # Ist das Modell schon geladen, fragt Transformers sonst bei jedem Start trotzdem den Hub
+    # (z. B. nach Chat-Vorlagen, die EdgeTAM gar nicht hat).
+    try:
+        return cls.from_pretrained(model_id, local_files_only=True)
+    except OSError:
+        return cls.from_pretrained(model_id)
 
 
 class Segmenter:
@@ -84,10 +78,9 @@ class Segmenter:
             if self.device == "cuda":
                 # TF32 ist auf aktuellen Karten deutlich schneller und für Masken genau genug.
                 torch.set_float32_matmul_precision("high")
-            model = EdgeTamVideoModel.from_pretrained(self._model_id)
+            model = _cached(EdgeTamVideoModel, self._model_id)
             self._model = model.to(self.device, torch.float32).eval()
-            self._model._use_mask_as_output = _uniform_scores(self._model._use_mask_as_output)
-            self._proc = Sam2VideoProcessor.from_pretrained(self._model_id)
+            self._proc = _cached(Sam2VideoProcessor, self._model_id)
             log.info("EdgeTAM läuft auf %s", self.device_label)
             self.ready.set()
         except Exception as exc:  # noqa: BLE001 – Fehler landet als Klartext in der Bedienung.
@@ -105,6 +98,16 @@ class Segmenter:
                                               binarize=True)[0]
         return masks[:, 0].cpu().numpy().astype(bool)
 
+    def _prompt(self, session, idx: int, obj_id: int, original_size, box, points) -> None:
+        kwargs = {}
+        if box is not None:
+            kwargs["input_boxes"] = [[[float(v) for v in box]]]
+        if points:
+            kwargs["input_points"] = [[[[float(x), float(y)] for x, y, _ in points]]]
+            kwargs["input_labels"] = [[[int(label) for _, _, label in points]]]
+        self._proc.add_inputs_to_inference_session(
+            inference_session=session, frame_idx=idx, obj_ids=obj_id, original_size=original_size, **kwargs)
+
     @torch.inference_mode()
     def predict(self, bgr: np.ndarray, box: list[float] | None, points: list[tuple[float, float, int]]
                 ) -> np.ndarray:
@@ -112,15 +115,7 @@ class Segmenter:
         with self._lock:
             session = self._new_session()
             inputs = self._inputs(bgr)
-            kwargs = {}
-            if box is not None:
-                kwargs["input_boxes"] = [[box]]
-            if points:
-                kwargs["input_points"] = [[[[x, y] for x, y, _ in points]]]
-                kwargs["input_labels"] = [[[label for _, _, label in points]]]
-            self._proc.add_inputs_to_inference_session(
-                inference_session=session, frame_idx=0, obj_ids=1,
-                original_size=inputs.original_sizes[0], **kwargs)
+            self._prompt(session, 0, 1, inputs.original_sizes[0], box, points)
             out = self._model(inference_session=session, frame=inputs.pixel_values[0])
             return self._full_res(out.pred_masks, inputs)[0]
 
@@ -136,19 +131,23 @@ class Segmenter:
             self._pending = False
 
     @torch.inference_mode()
-    def add_object(self, obj_id: int, bgr: np.ndarray, mask: np.ndarray) -> None:
-        """Bestätigte Registrierungsmaske wird zum festen Ankerbild dieses Roboters."""
+    def add_object(self, obj_id: int, bgr: np.ndarray, box: list[float] | None,
+                   points: list[tuple[float, float, int]]) -> np.ndarray:
+        """Box und Klicks der Registrierung werden zum festen Ankerbild; zurück kommt die Ankermaske."""
         with self._lock:
             if self._session is None:
                 self._session = self._new_session()
             self._idx += 1
             inputs = self._inputs(bgr)
-            self._proc.add_inputs_to_inference_session(
-                inference_session=self._session, frame_idx=self._idx, obj_ids=obj_id, input_masks=[mask])
+            # Box statt Maske: Mit einer Masken-Eingabe verliert EdgeTAM den Roboter nach zwei Bildern,
+            # sobald ein zweites Objekt im Bild ist.
+            self._prompt(self._session, self._idx, obj_id, inputs.original_sizes[0], box, points)
             out = self._model(inference_session=self._session, frame_idx=self._idx,
                               frame=inputs.pixel_values[0])
-            self._clean(out, new=obj_id)
+            ids, logits, _ = self._clean(out, new=obj_id)
             self._prune()
+            i = ids.index(obj_id)
+            return self._full_res(torch.from_numpy(logits[i:i + 1, None]), inputs)[0]
 
     @torch.inference_mode()
     def track(self, bgr: np.ndarray) -> dict[int, Track]:
@@ -160,12 +159,14 @@ class Segmenter:
             out = self._model(inference_session=self._session, frame_idx=self._idx,
                               frame=inputs.pixel_values[0])
             ids, logits, ok = self._clean(out, new=None)
-            if self._swap_needed(ids, logits, ok):
+            swap = self._swap_needed(ids, logits, ok)
+            if swap:
                 logits = logits[::-1].copy()
-                self._reanchor(ids, logits)
+            masks = self._full_res(torch.from_numpy(logits[:, None]), inputs)
+            if swap:
+                self._reanchor(ids, logits, masks, inputs)
                 log.info("Roboter nach Berührung vertauscht erkannt, Identitäten korrigiert")
             self._prune()
-            masks = self._full_res(torch.from_numpy(logits[:, None]), inputs)
             return {oid: Track(masks[i], ok[i]) for i, oid in enumerate(ids)}
 
     def _clean(self, out, new: int | None) -> tuple[list[int], np.ndarray, list[bool]]:
@@ -190,6 +191,9 @@ class Segmenter:
             obj_idx = s.obj_id_to_idx(oid)
             if good:
                 self._prev[oid] = mask
+                # Langsam nachführen: Perspektive und Drehung ändern die Pixelfläche, eine Hand dagegen
+                # springt sofort und fällt weiter aus dem Rahmen.
+                self._ref_area[oid] += REF_AREA_RATE * (float(mask.sum()) - self._ref_area[oid])
                 if ((raw[i] > 0) != mask).any():
                     self._remember(obj_idx, feats[-1], logits[i])
             else:
@@ -238,19 +242,18 @@ class Segmenter:
         sim = np.array([[float(now[i] @ refs[j]) for j in range(2)] for i in range(2)])
         return should_swap(sim)
 
-    def _reanchor(self, ids: list[int], logits: np.ndarray) -> None:
-        """Vertauschte Erinnerungen verwerfen und die richtigen Masken als neue Ankerbilder setzen."""
+    def _reanchor(self, ids: list[int], logits: np.ndarray, masks: np.ndarray, inputs) -> None:
+        """Vertauschte Erinnerungen verwerfen und die richtigen Roboter per Box neu verankern."""
         s, idx = self._session, self._idx
         for oid in ids:
             obj_idx = s.obj_id_to_idx(oid)
             s.output_dict_per_obj[obj_idx]["non_cond_frame_outputs"].clear()
             s.frames_tracked_per_obj[obj_idx].clear()
-        masks = [torch.from_numpy(m > 0) for m in logits]
-        # Eine Kopie: HF übernimmt die Liste als obj_with_new_inputs und leert sie nach dem Lauf.
-        self._proc.add_inputs_to_inference_session(
-            inference_session=s, frame_idx=idx, obj_ids=list(ids), input_masks=masks)
-        self._model(inference_session=s, frame_idx=idx)
         for i, oid in enumerate(ids):
+            x, y, w, h = cv2.boundingRect(masks[i].astype(np.uint8))
+            self._prompt(s, idx, oid, inputs.original_sizes[0], [x, y, x + w, y + h], [])
+            # Einzeln: HF merkt sich pro Aufruf nur die zuletzt übergebenen Objekte als neu.
+            self._model(inference_session=s, frame_idx=idx)
             self._prev[oid] = logits[i] > 0
 
     def _prune(self) -> None:

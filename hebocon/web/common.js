@@ -48,10 +48,18 @@ export async function act(name, data = {}) {
   return res.json();
 }
 
-// Letterbox: Kamerabild passt ins Canvas, Seitenverhältnis bleibt.
+// Letterbox: Kamerabild passt ins Canvas, Seitenverhältnis bleibt. Ein Rand (`pad`) gehört zum Bild,
+// die Koordinaten bleiben aber Arena-Einheiten mit (0, 0) in der Feldecke.
 export function fit(canvas, frame) {
-  const s = Math.min(canvas.width / frame.w, canvas.height / frame.h);
+  const p = frame.pad || 0;
+  const s = Math.min(canvas.width / (frame.w + 2 * p), canvas.height / (frame.h + 2 * p));
   return { s, ox: (canvas.width - frame.w * s) / 2, oy: (canvas.height - frame.h * s) / 2 };
+}
+
+export function drawFrame(ctx, v, frame, bitmap) {
+  const p = frame.pad || 0;
+  const [x, y] = toCanvas(v, [-p, -p]);
+  ctx.drawImage(bitmap, x, y, (frame.w + 2 * p) * v.s, (frame.h + 2 * p) * v.s);
 }
 
 export function toCanvas(v, p) {
@@ -84,20 +92,20 @@ export function resizeCanvas(canvas) {
 }
 
 // Tastenkürzel in beiden Fenstern gleich, damit die Bühne im Vollbild auch bedienbar bleibt.
-export function hotkeys(getName = () => "") {
+export function hotkeys(getNames = () => []) {
   window.addEventListener("keydown", (e) => {
     if (e.target instanceof HTMLInputElement) {
-      if (e.key === "Enter") act("confirm", { name: getName() });
+      if (e.key === "Enter") act("start", { names: getNames() });
       return;
     }
     const map = {
       o: ["spawn", { kind: "obstacle" }],
       p: ["spawn", { kind: "powerup" }],
+      k: ["shrink"],
       n: ["new_battle"],
-      d: ["detect"],
-      r: ["retry"],
-      s: ["start"],
-      Enter: ["confirm", { name: getName() }],
+      s: ["start", { names: getNames() }],
+      1: ["ulti", { player: 1 }],
+      2: ["ulti", { player: 2 }],
     };
     const hit = map[e.key] || map[e.key.toLowerCase()];
     if (!hit) return;

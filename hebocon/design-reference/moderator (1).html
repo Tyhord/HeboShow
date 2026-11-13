@@ -1,0 +1,316 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FightCam Arena – vollständige Einstellungs-Vorschau</title><style>
+:root{font-family:Inter,Arial,sans-serif;color:#fff;background:#080b13}*{box-sizing:border-box}body{margin:0;overflow:hidden}.arena{height:100dvh;width:100vw;position:relative;overflow:hidden;background:radial-gradient(ellipse at center,#263e51,#080b13 80%)}video{position:absolute;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}.fallback{position:absolute;inset:0;display:grid;place-content:center;text-align:center;gap:12px;color:#b7c5d6;background:radial-gradient(ellipse at 50% 60%,#263d51,#080b13 80%)}.fallback strong{font-size:clamp(25px,5vw,56px);letter-spacing:.25em;color:#f2f5fc}.fallback span{font-size:14px}.scan{position:absolute;inset:0;pointer-events:none;background:linear-gradient(transparent 60%,#0004);box-shadow:inset 0 0 140px #0009}.hud{position:absolute;top:24px;left:3%;right:3%;display:grid;grid-template-columns:minmax(0,1fr) 108px minmax(0,1fr);align-items:start;gap:10px;filter:drop-shadow(0 3px 6px #000b)}.player{min-width:0}.player.right{text-align:right}.name{font-size:clamp(10px,1.4vw,15px);font-weight:900;letter-spacing:.2em;margin-bottom:8px;text-shadow:0 2px 6px #000}.health{height:clamp(15px,2.8vw,26px);padding:3px;background:#10131bc9;border:2px solid #d9e4f2;clip-path:polygon(0 0,100% 0,100% 100%,0 100%)}.fill{height:100%;width:100%;background:linear-gradient(90deg,#ffae35,#f34a4e);transition:width .3s}.right .fill{margin-left:auto;background:linear-gradient(90deg,#e83f66,#ff9b47)}.timer{text-align:center;font-size:clamp(35px,6vw,67px);font-weight:1000;line-height:.9;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 3px 0 #a55b00,0 6px 12px #000}.timer-label{font-size:10px;letter-spacing:.28em;margin-top:12px;color:#cdd9e8}.bottom{position:absolute;bottom:24px;left:3%;font-size:11px;letter-spacing:.24em;color:#d1dce7a8}.edge{position:absolute;right:0;top:0;width:36px;height:100%;z-index:5}.drawer{position:absolute;z-index:6;right:0;top:50%;transform:translate(110%,-50%);transition:transform .25s;display:flex;flex-direction:column;gap:12px;padding:20px 15px 20px 20px;background:#0b1221d9;border:1px solid #ffffff33;border-radius:18px 0 0 18px;backdrop-filter:blur(14px)}.edge:hover~.drawer,.drawer:hover,.drawer.open{transform:translate(0,-50%)}button{cursor:pointer;color:white;background:#ffffff17;border:1px solid #ffffff55;border-radius:12px;padding:13px 17px;font-weight:800;font-size:16px}button:hover{background:#ad5600}button.primary{background:#a65300;border-color:#ffd194}.panel{position:absolute;z-index:7;right:100px;top:50%;transform:translateY(-50%);width:min(320px,calc(100vw - 120px));background:#0b1221ed;border:1px solid #ffffff44;border-radius:16px;padding:22px;box-shadow:0 15px 50px #0009}.panel[hidden]{display:none}.panel h2{margin:0 0 18px}.panel label{display:block;font-size:13px;margin:14px 0 7px;color:#c8d2e0}.panel input{width:100%;accent-color:#ad5600}.panel .buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}.panel .buttons button{font-size:12px}.status{position:absolute;bottom:22px;right:3%;color:#d6e0ee;font-size:12px;text-shadow:0 1px 4px #000}.hidden{display:none!important}@media(max-width:600px){.hud{grid-template-columns:minmax(0,1fr) 62px minmax(0,1fr);gap:5px;top:18px}.timer-label{font-size:8px}.name{letter-spacing:.06em}.panel{right:75px}}
+
+/* FightCam settings: consistent with the arcade HUD */
+.panel{width:min(380px,calc(100vw - 125px));max-height:min(85dvh,750px);overflow-y:auto;padding:0;background:linear-gradient(145deg,rgba(18,29,47,.97),rgba(8,13,24,.97));border:1px solid #849ab547;box-shadow:0 24px 75px #000c, inset 0 1px #ffffff13;backdrop-filter:blur(20px);border-radius:20px;scrollbar-color:#59677955 transparent}
+.panel h2{padding:23px 24px 17px;margin:0;border-bottom:1px solid #ffffff1c;font-size:17px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#f7f9ff}
+.panel .settings-content{padding:6px 24px 24px}
+.panel .settings-subtitle{margin:14px 0 12px;color:#8198b0;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.19em}
+.panel label{font-size:12px;line-height:1.5;font-weight:700;color:#d3deeb;margin:16px 0 11px;display:flex;justify-content:space-between;gap:12px}
+.panel label span{color:#ffc078;font-weight:900;font-variant-numeric:tabular-nums}
+.panel input[type=range]{display:block;width:100%;height:5px;padding:0;margin:0 0 19px;accent-color:#ad5600;cursor:pointer}
+.panel .settings-divider{height:1px;background:linear-gradient(90deg,#ffffff29,transparent);margin:21px 0 12px}
+.panel .buttons{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
+.panel .buttons button{font-size:12px;font-weight:800;padding:12px 8px;min-height:43px;background:#ffffff0d;border-color:#ffffff2e;border-radius:11px}
+.panel .buttons button:hover{background:#ad5600;border-color:#ffd194}
+.panel .buttons #reset{grid-column:1/-1;background:#a65300;border-color:#ffd194}
+.panel .buttons #close{background:#ffffff13}
+.panel .settings-note{font-size:11px;color:#8198b0;line-height:1.5;margin:2px 0 0}
+@media(max-width:600px){.panel{right:70px;width:calc(100vw - 86px)}.panel .settings-content{padding:5px 17px 18px}.panel h2{padding:18px 17px}}
+
+/* Full settings navigation */
+.panel{width:min(660px,calc(100vw - 115px));right:92px;max-height:92dvh;display:flex;flex-direction:column;overflow:hidden}
+.panel h2{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.panel .panel-close{font-size:19px;padding:5px 10px;background:transparent;border:0}
+.settings-layout{min-height:0;display:grid;grid-template-columns:164px minmax(0,1fr);flex:1}
+.settings-tabs{padding:14px 9px;border-right:1px solid #ffffff1c;display:flex;flex-direction:column;gap:4px;background:#060b1555}
+.settings-tabs button{border:1px solid transparent;background:transparent;text-align:left;border-radius:10px;padding:12px 9px;font-size:12px;font-weight:700;white-space:nowrap}
+.settings-tabs button.active{background:#ad560026;border-color:#f3920077;color:#ffd194}
+.settings-tabs button:hover{background:#ffffff16}
+.panel .settings-content{min-width:0;overflow-y:auto;max-height:calc(92dvh - 75px);padding:12px 23px 24px}
+.tabpane[hidden]{display:none!important}.panel section.group{margin:12px 0 22px;border-bottom:1px solid #ffffff1b;padding-bottom:17px}
+.panel h3{font-size:13px;letter-spacing:.12em;text-transform:uppercase;margin:8px 0 16px;color:#f1f5ff}
+.panel .hint{color:#8fa2b8;font-size:11px;line-height:1.6;margin:9px 0 14px}
+.panel input[type=text],.panel input[type=password],.panel input[type=number],.panel textarea,.panel select{width:100%;background:#080e1c;color:#edf3ff;border:1px solid #52667c88;border-radius:9px;padding:10px;min-height:38px;font:inherit;font-size:12px}
+.panel textarea{resize:vertical;min-height:85px}.panel input[type=checkbox]{width:auto;accent-color:#ad5600}
+.panel .checkrow{display:flex;align-items:center;justify-content:flex-start;gap:11px;margin:12px 0;font-size:12px;font-weight:600;color:#d5dfeb}
+.panel .checkrow input{margin:0;flex:none}.panel .switches{display:grid;grid-template-columns:1fr 1fr;gap:7px 12px}
+.panel .rowbuttons{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.panel .rowbuttons button,.panel .modebuttons button{padding:10px 12px;font-size:12px;font-weight:700}
+.panel .modebuttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.panel .modebuttons button.active{background:#a65300;border-color:#ffd194}
+.panel details{border:1px solid #ffffff29;border-radius:11px;padding:10px 12px;margin-top:13px;background:#ffffff07}
+.panel summary{cursor:pointer;font-size:12px;font-weight:800;color:#e1ebfa}
+.panel .readonly{color:#8fa2b8;font-size:11px;margin:9px 0}.panel .log{max-height:100px;overflow:auto;background:#050b13a6;border:1px solid #ffffff20;padding:10px;border-radius:9px;font-size:11px;color:#bdc9d9}
+.panel .button-wide{width:100%;margin-top:12px;background:#a65300;border-color:#ffd194;font-size:12px}
+.panel .micro{display:grid;grid-template-columns:1fr 1fr;gap:8px}.panel .micro label{margin-bottom:5px}
+.demo-pill{font-size:9px;background:#ffffff17;border:1px solid #ffffff33;border-radius:20px;padding:5px 8px;letter-spacing:.08em;color:#aabacc}
+.toast{position:absolute;bottom:55px;left:50%;transform:translateX(-50%);z-index:10;padding:12px 18px;max-width:70%;text-align:center;background:#111f32ed;border:1px solid #f3920088;border-radius:12px;color:#ecf3ff;font-size:12px;display:none}
+.calibration{position:absolute;inset:0;z-index:2;cursor:crosshair;display:none}.calibration.active{display:block}.calibration svg{width:100%;height:100%}
+@media(max-width:600px){.panel{right:62px;width:calc(100vw - 69px)}.settings-layout{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.settings-tabs{flex-direction:row;overflow-x:auto;gap:3px;border-right:0;border-bottom:1px solid #ffffff22;padding:8px}.settings-tabs button{padding:8px;font-size:11px}.panel .settings-content{max-height:calc(90dvh - 135px)}.panel .switches{grid-template-columns:1fr}}
+
+/* Accessibility and stable settings window (2026-10-21) */
+.panel{height:min(790px,92dvh);max-height:92dvh;min-height:0}
+.settings-layout{height:100%;min-height:0;overflow:hidden}
+.panel .settings-content{height:100%;max-height:none;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.settings-tabs{overflow-y:auto;min-height:0}
+.panel h2{font-size:20px;letter-spacing:.045em;line-height:1.4}
+.panel h3{font-size:16px;letter-spacing:.035em;line-height:1.4}
+.panel .settings-subtitle{font-size:13px;letter-spacing:.06em;color:#c4d4e8}
+.settings-tabs button{font-size:15px;line-height:1.35;min-height:47px;padding:12px 11px;white-space:normal}
+.panel label,.panel .checkrow{font-size:15px;line-height:1.5}
+.panel .hint,.panel .settings-note,.panel .readonly{font-size:14px;line-height:1.55;color:#c2d1e5}
+.panel summary{font-size:15px;line-height:1.5;min-height:30px}
+.panel input[type=text],.panel input[type=password],.panel input[type=number],.panel textarea,.panel select{font-size:16px;min-height:44px;border-color:#8fa6c2}
+.panel .rowbuttons button,.panel .modebuttons button,.panel .buttons button,.panel .button-wide{font-size:14px;min-height:44px;line-height:1.35}
+.panel .log{font-size:14px;line-height:1.55;max-height:155px}
+.demo-pill{font-size:11px;color:#e2eaf6}
+.panel .checkrow input[type=checkbox]{width:19px;height:19px}
+.panel input[type=range]{height:20px;min-height:20px}
+.panel :is(button,input,select,textarea,summary):focus-visible,.drawer button:focus-visible{outline:3px solid #ffd36d;outline-offset:3px;position:relative;z-index:1}
+.panel button:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:600px){.panel{height:90dvh;max-height:90dvh}.settings-layout{grid-template-rows:auto minmax(0,1fr)}.settings-tabs{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap}.settings-tabs button{font-size:14px;min-height:44px;white-space:nowrap}.panel .settings-content{height:100%;max-height:none;padding:12px 16px 24px}.panel h2{font-size:17px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+/* InterFace-inspired orange accents; original player bars and Play button preserved.
+   Brand hex is an approximation, not a verified official value. */
+:root { --if-orange:#f39200; --if-orange-dark:#a65300; --if-orange-soft:#ffd194; }
+#play, #play:hover, #play:focus-visible { background:#e3475a; border-color:#ff8794; color:#fff; }
+.fill { background:linear-gradient(90deg,#ffae35,#f34a4e); }
+.right .fill { background:linear-gradient(90deg,#e83f66,#ff9b47); }
+.settings-tabs button.active { background:#f3920026; border-color:#f39200; color:#ffd194; }
+.panel .modebuttons button.active,.panel .button-wide,.panel .buttons #reset { background:#a65300; border-color:#f39200; color:#fff; }
+.panel input[type=range],.panel input[type=checkbox] { accent-color:#f39200; }
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible { outline:3px solid #ffd194; outline-offset:3px; }
+
+/* Fixed moderator picture-in-picture, below the LIVE ARENA label. */
+.moderator-dock{position:absolute;left:3%;bottom:22px;z-index:3;width:clamp(190px,23vw,310px);display:flex;flex-direction:column;gap:9px}
+.moderator-dock .bottom{position:static;font-size:12px;font-weight:800;color:#e2eaf6;letter-spacing:.21em;text-shadow:0 2px 7px #000}
+.moderator-frame{position:relative;aspect-ratio:16/9;overflow:hidden;border-radius:13px;border:2px solid #b8c9d9;background:linear-gradient(145deg,#19293c,#080c15);box-shadow:0 10px 30px #000b,inset 0 0 20px #0007}
+.moderator-frame::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;box-shadow:inset 0 0 24px #0009}
+.moderator-frame video{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.moderator-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#e2eaf6;text-align:center;padding:12px}
+.moderator-empty svg{width:34px;height:34px;stroke:#f39200;fill:none;stroke-width:1.6}
+.moderator-empty span{font-size:14px;font-weight:800}.moderator-empty small{font-size:12px;color:#c2d1e5}
+.moderator-meta{position:absolute;bottom:0;left:0;right:0;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:4px;padding:20px 9px 8px;background:linear-gradient(transparent,#070b14e8);font-size:12px;font-weight:800;letter-spacing:.06em;pointer-events:none}
+.moderator-dot{display:inline-block;background:#f39200;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.moderator-camera-action{position:absolute;z-index:4;top:8px;right:8px;min-height:36px;padding:6px 9px;font-size:12px;background:#07101ddd;border:1px solid #d0dceb;border-radius:8px}
+.moderator-camera-action:hover{background:#a65300}
+@media(max-width:600px){.moderator-dock{left:3%;bottom:19px;width:clamp(155px,42vw,235px)}.moderator-dock .bottom{font-size:10px}.moderator-empty span{font-size:12px}.moderator-empty small{font-size:11px}}
+
+/* Broadcast K.O. overlay – only shown on the arena display */
+.ko-overlay{position:fixed;inset:0;z-index:30;display:grid;place-items:center;pointer-events:none;visibility:hidden;opacity:0;background:radial-gradient(ellipse at center,#160b1a65,transparent 70%);transition:opacity .22s ease,visibility .22s ease}
+.ko-overlay.is-visible{visibility:visible;opacity:1}
+.ko-text{display:block;color:#fff0c4;font-family:Impact,'Arial Black',system-ui,sans-serif;font-weight:1000;font-size:clamp(110px,24vw,340px);font-style:italic;letter-spacing:-.055em;line-height:1;text-shadow:5px 5px 0 #951c36,11px 12px 0 #2a101a,0 0 32px #ffb84a,0 16px 55px #000;transform:scale(.55) rotate(-7deg);opacity:0}
+.ko-overlay.is-visible .ko-text{animation:ko-entrance .48s cubic-bezier(.15,1.4,.4,1) forwards}
+.ko-overlay.is-ending .ko-text{animation:ko-exit .42s ease-in forwards}
+@keyframes ko-entrance{0%{opacity:0;transform:scale(1.85) rotate(-10deg)}75%{opacity:1;transform:scale(.94) rotate(-4deg)}100%{opacity:1;transform:scale(1) rotate(-5deg)}}
+@keyframes ko-exit{to{opacity:0;transform:scale(1.2) rotate(-5deg)}}
+.dashboard-tools .ko-trigger{border:2px solid #ffcd78;background:#8e1e38;color:#fff;min-width:120px;font-weight:1000;font-size:20px;letter-spacing:.07em}
+.dashboard-tools .ko-trigger:hover{background:#b32d48}
+.dashboard-tools .ko-trigger:focus-visible{outline:3px solid #ffdb95;outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.ko-overlay,.ko-text{animation:none!important;transition:none!important}.ko-overlay.is-visible .ko-text{opacity:1;transform:none}}
+</style><style>
+
+/* Two-screen moderator / arena additions */
+.view-switch{position:fixed;z-index:20;right:18px;bottom:18px;padding:10px 15px;background:#172334e8;color:#fff;border:1px solid #f39200;border-radius:12px;font-size:14px;text-decoration:none;font-weight:800;box-shadow:0 5px 22px #0008}
+.view-switch:hover,.view-switch:focus-visible{background:#a65300;outline:3px solid #ffd087;outline-offset:2px}
+body[data-view="arena"] .edge,body[data-view="arena"] .drawer,body[data-view="arena"] .panel{display:none!important}
+body[data-view="arena"] .status{bottom:70px}
+body[data-view="dashboard"]{overflow:auto;background:#090f1b;color:#f2f5fc}
+body[data-view="dashboard"] .arena{height:0!important;min-height:0!important;overflow:hidden!important;position:absolute;visibility:hidden;pointer-events:none}
+.dashboard-shell{display:none}
+body[data-view="dashboard"] .dashboard-shell{display:grid;grid-template-columns:minmax(310px,0.92fr) minmax(480px,1.35fr);gap:20px;min-height:100dvh;padding:22px;max-width:1700px;margin:auto}
+.dashboard-heading{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.dashboard-heading h1{margin:0;font-size:clamp(24px,2.5vw,35px);letter-spacing:.025em}
+.dashboard-heading p{margin:5px 0 0;font-size:15px;color:#bfcfe0}
+.dashboard-panel{background:linear-gradient(145deg,#152238,#0b1221);border:1px solid #526276;border-radius:20px;box-shadow:0 15px 40px #0007;min-width:0}
+.soundboard{padding:22px;align-self:start;position:sticky;top:20px}
+.soundboard h2{font-size:22px;margin:0 0 6px}.soundboard p{color:#c3d2e1;font-size:15px;line-height:1.5}
+.sound-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:15px 0 20px}
+.sound-actions label{display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:700;border:1px solid #f39200;border-radius:12px;background:#a65300;padding:12px 15px;cursor:pointer}
+.sound-actions label:focus-within{outline:3px solid #ffd087;outline-offset:3px}
+.sound-actions input{width:0;height:0;opacity:0;position:absolute}
+.board-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.board-tile{min-height:118px;padding:14px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;justify-content:center;text-align:left;background:#17263b;border:1px solid #65758d;border-radius:16px;overflow-wrap:anywhere}
+.board-tile:hover{background:#34445b}.board-tile:focus-visible{outline:3px solid #ffd087;outline-offset:3px}
+.board-tile .tile-symbol{font-size:27px}.board-tile strong{font-size:16px}.board-tile small{font-size:13px;color:#c7d7e9}
+.board-tile.is-empty{border-style:dashed;border-color:#76889b;color:#c8d6e9}
+.board-footer{margin-top:17px;padding:13px;border-radius:12px;background:#0d1828;border:1px solid #43546b;color:#dce7f5;font-size:14px;line-height:1.5}
+.dashboard-settings{padding:0;overflow:hidden;min-height:620px;height:calc(100dvh - 120px);position:sticky;top:20px}
+body[data-view="dashboard"] .dashboard-settings .panel{position:static;display:flex!important;transform:none!important;width:100%;max-height:none;height:100%;border:0;border-radius:20px;background:transparent;box-shadow:none}
+body[data-view="dashboard"] .dashboard-settings .panel[hidden]{display:flex!important}
+body[data-view="dashboard"] .dashboard-settings .panel .panel-close{display:none}
+body[data-view="dashboard"] .dashboard-settings .panel .settings-content{height:100%;overflow:auto}
+body[data-view="dashboard"] .dashboard-settings .settings-layout{min-height:0}
+body[data-view="dashboard"] .dashboard-settings .settings-tabs{min-width:165px}
+body[data-view="dashboard"] .dashboard-settings .panel h2{margin:0}
+.dashboard-tools{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}.dashboard-tools button{min-height:45px}
+.dashboard-tools button.action{background:#a65300;border-color:#f39200}
+body[data-view="dashboard"] .view-switch{position:static;display:inline-flex;align-items:center}
+.connection-state{padding:8px 12px;border-radius:10px;border:1px solid #667990;background:#142239;color:#fff;font-size:14px}
+.media-overlay{position:fixed;z-index:16;inset:12% 16%;pointer-events:none;display:none;align-items:center;justify-content:center}
+.media-overlay.active{display:flex}.media-overlay img,.media-overlay video{display:block;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 10px 28px #000b)}
+.media-overlay .media-name{position:absolute;bottom:0;left:0;right:0;text-align:center;font-weight:900;text-shadow:0 2px 5px #000;font-size:20px}
+@media(max-width:900px){body[data-view="dashboard"] .dashboard-shell{grid-template-columns:1fr;padding:14px}.soundboard,.dashboard-settings{position:static}.dashboard-settings{height:720px;min-height:0}.dashboard-heading{grid-column:1}.board-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:580px){.board-grid{grid-template-columns:repeat(2,minmax(0,1fr))}body[data-view="dashboard"] .dashboard-settings .settings-layout{grid-template-columns:1fr;grid-template-rows:auto 1fr}.dashboard-settings{height:700px}.view-switch{font-size:13px}.dashboard-heading h1{font-size:25px}}
+@media(prefers-reduced-motion:reduce){.media-overlay *{animation:none!important;transition:none!important}}
+
+
+/* Constant moderator microphone control */
+.dashboard-tools .mic-mute{border:2px solid #ffd08a;background:#293448;color:#fff;min-width:167px}
+.dashboard-tools .mic-mute:not(.is-muted){border-color:#f39200;background:#a65300}
+.dashboard-tools .mic-mute:focus-visible{outline:3px solid #ffd087;outline-offset:3px}
+.microphone-feedback{margin:0 0 12px!important;padding:10px 12px;background:#101e31;border-left:3px solid #f39200;border-radius:8px;color:#f1f5fc!important;font-size:14px!important}
+</style></head><body data-view="dashboard"><div class="dashboard-shell"><header class="dashboard-heading"><div><h1>MODERATOR CONTROL</h1><p>Hebocon · Einstellungen &amp; Mediensteuerung</p></div><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="connection-state" id="connection" role="status">○ Kampfansicht nicht geöffnet</span><a class="view-switch" href="index.html" target="_blank" rel="noopener">↗ Kampfansicht öffnen</a></div></header><section class="soundboard dashboard-panel" aria-label="Soundboard und Meme-Board"><h2>🎛️ Meme- &amp; Soundboard</h2><p>Dieses Board bleibt sichtbar, während du rechts zwischen den Einstellungen wechselst. Medien lassen sich temporär in die Kampfansicht senden.</p><div class="dashboard-tools"><button id="dashboardPlay" class="action">▶ Start / Pause</button><button id="dashboardReset">↺ Reset</button><button id="dashboardKO" type="button" class="ko-trigger" title="Große K.O.-Einblendung auf der Kampfansicht auslösen" aria-label="K.O.-Einblendung auslösen">K.O.!</button><button id="dashboardMute" type="button" class="mic-mute is-muted" aria-pressed="true" title="Moderator-Mikrofon aktivieren" aria-label="Moderator-Mikrofon aktivieren">🔇 Mikro stumm</button><button id="dashboardStopMedia">■ Medien stoppen</button></div><p class="microphone-feedback" id="microphoneFeedback" role="status" aria-live="polite">Mikrofon ist stumm. Zum Aktivieren klicken und den Browserzugriff erlauben. (Lokale Demo, noch nicht mit der Übertragung verbunden.)</p><div class="sound-actions"><label>＋ Medien hinzufügen <input id="boardFiles" type="file" accept="audio/*,image/*,video/*" multiple aria-label="Audio-, Bild- oder Videodateien auswählen"></label><button id="boardDemo" type="button">♫ Testton lokal</button></div><div id="boardSlots" class="board-grid"><div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erster Sound</strong><small>Audio hochladen</small></div><div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erstes Meme</strong><small>Bild oder Video hochladen</small></div></div><div class="board-footer">Hinweis: Dies ist eine Vorschau. Hochgeladene Dateien sind nur während der Sitzung im Moderatorfenster verfügbar. Ton in der Kampfansicht kann eine vorherige Browser-Interaktion erfordern. Es gibt noch keine Backend-Mediathek.</div></section><section class="dashboard-settings dashboard-panel" id="settingsMount" aria-label="Einstellungen"></section></div><main class="arena"><div class="fallback" id="fallback"><strong>FIGHTCAM</strong><span id="hint">Kamera wird initialisiert …</span></div><video id="camera" autoplay muted playsinline></video><div class="scan"></div><div class="calibration" id="calibration"><svg viewBox="0 0 100 100" preserveAspectRatio="none" id="calibrationSvg"></svg></div>
+<header class="hud"><div class="player"><div class="name">PLAYER 01</div><div class="health"><div class="fill" id="hp1"></div></div></div><div><div class="timer" id="timer">60</div><div class="timer-label" style="text-align:center">ROUND 01</div></div><div class="player right"><div class="name">PLAYER 02</div><div class="health"><div class="fill" id="hp2"></div></div></div></header>
+<aside class="moderator-dock" aria-label="Moderatorfenster"><div class="bottom">LIVE ARENA <span style="color:#f39200">●</span></div><div class="moderator-frame"><video id="moderatorVideo" autoplay muted playsinline aria-label="Videobild des Moderators"></video><div class="moderator-empty" id="moderatorEmpty"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="10" r="5"/><path d="M6 27v-2a10 10 0 0 1 20 0v2"/></svg><span>MODERATOR</span><small>Kein Livebild</small></div><button type="button" class="moderator-camera-action" id="moderatorCameraButton" title="Moderator-Kamera starten oder stoppen" aria-label="Moderator-Kamera starten">📷</button><div class="moderator-meta"><span><span class="moderator-dot"></span>MODERATOR</span><span id="moderatorStatus">OFFLINE</span></div></div></aside><div class="status" id="status">BEREIT</div><div class="edge" aria-label="Steuerung am rechten Rand einblenden"></div><nav class="drawer" id="drawer"><button class="primary" id="play" title="Start / Pause">▶</button><button id="menu" title="Menü">☰</button></nav>
+<section class="panel" id="panel" hidden><h2>⚙ Einstellungen <span class="demo-pill">INTERAKTIVE DEMO</span><button class="panel-close" id="close" aria-label="Schließen">✕</button></h2><div class="settings-layout"><nav class="settings-tabs" aria-label="Einstellungsbereiche" aria-label="Einstellungsbereiche"><button class="active" data-tab="steuerung">🎮 Steuerung</button><button data-tab="kamera">📷 Kamera</button><button data-tab="spielfeld">🔳 Spielfeld</button><button data-tab="erkennung">🔎 Erkennung</button><button data-tab="moderation">🎙️ Moderation</button><button data-tab="regeln">❤️ Regeln</button></nav><div class="settings-content">
+<div class="tabpane" id="tab-steuerung"><section class="group"><h3>Kampfsteuerung</h3><div class="rowbuttons"><button class="primary" id="playMenu">▶ Start / Pause</button><button id="reset">↻ Neues Match</button><button id="cameraButton">📷 Kamera aktivieren</button><button id="fullscreen">⛶ Vollbild</button></div></section><section class="group"><h3>Countdown</h3><label for="duration">Rundendauer <span><span id="durationValue">60</span> Sekunden</span></label><input type="range" id="duration" min="10" max="300" step="5" value="60"><p class="hint">Der Countdown wird in dieser Vorschau lokal gesteuert.</p></section><section class="group"><h3>Anzeigeoptionen</h3><div class="switches"><label class="checkrow"><input type="checkbox" id="showHud" checked> Lebensleisten &amp; Timer</label><label class="checkrow"><input type="checkbox" id="showArena" checked> Spielfeldmarkierung</label><label class="checkrow"><input type="checkbox" id="showBoxes" checked> Fahrzeug-Markierungen</label><label class="checkrow"><input type="checkbox" id="showTicker" checked> Ereignismeldungen</label><label class="checkrow"><input type="checkbox" id="showCaptions" checked> KI-Untertitel</label></div></section></div>
+<div class="tabpane" id="tab-kamera" hidden><section class="group"><h3>Kamera für das Spielfeld</h3><label for="arenaSource">Kameraquelle</label><select id="arenaSource"><option>Browserkamera</option><option>Backend-Kamera / Stream</option><option>Videodatei</option></select><label for="arenaDevice">Gerät auswählen</label><select id="arenaDevice"><option>Standardkamera</option></select><div class="rowbuttons"><button data-backend="Arena-Kameraquelle übernehmen">Quelle übernehmen</button><button id="rescanCamera">Geräte suchen</button><button data-backend="Erkennungspipeline neu starten">Erkennung neu starten</button></div><p class="hint">Backend-Kameraquellen und die Pipeline sind nur in der Angular-Anwendung verbunden.</p></section><section class="group"><h3>Kamera für den Moderator</h3><label>Kameraquelle</label><select><option>Browserkamera</option><option>Backend-Kamera</option></select><div class="rowbuttons"><button data-backend="Moderator-Kameraquelle übernehmen">Quelle übernehmen</button><button data-backend="Moderator-Kamera starten / stoppen">Kamera starten / stoppen</button></div></section></div>
+<div class="tabpane" id="tab-spielfeld" hidden><section class="group"><h3>So wird das Spielfeld erkannt</h3><div class="modebuttons" data-choice="arenaMode"><button class="active" data-val="tape">🟨 Klebeband</button><button data-val="aruco">🔳 Marker</button><button data-val="auto">✨ Automatisch</button><button data-val="manual">👆 Ecken klicken</button></div><p class="hint">Zur Kalibrierung werden im echten Projekt die Einstellungen an die Spielfelderkennung übergeben.</p></section><section class="group"><h3>Farbe des Bandes</h3><div class="rowbuttons"><button id="pickColor">Farbe im Bild anklicken</button><button data-backend="Farbmaske anzeigen">Maske prüfen</button></div><div class="rowbuttons"><button data-backend="Gelb-Preset verwenden">Gelb</button><button data-backend="Blau-Preset verwenden">Blau</button><button data-backend="Rot-Preset verwenden">Rot</button><button data-backend="Grün-Preset verwenden">Grün</button></div><details><summary>Feinschliff</summary><label>Farbton Untergrenze <span id="hueMinValue">20</span></label><input type="range" min="0" max="179" value="20" data-out="hueMinValue"><label>Farbton Obergrenze <span id="hueMaxValue">40</span></label><input type="range" min="0" max="179" value="40" data-out="hueMaxValue"><label>Mindestsättigung <span id="satValue">80</span></label><input type="range" min="0" max="255" value="80" data-out="satValue"><label>Mindesthelligkeit <span id="valValue">80</span></label><input type="range" min="0" max="255" value="80" data-out="valValue"><label>Lücken schließen <span id="kernelValue">11</span> px</label><input type="range" min="3" max="61" step="2" value="11" data-out="kernelValue"><label class="checkrow"><input type="checkbox" checked> Auf Viereck begradigen</label></details></section><section class="group"><h3>Manuelle Kalibrierung</h3><button id="pickCorners">Vier Ecken im Bild anklicken</button><p class="hint">Zeichnet die gewählten Punkte in der Demo ein. Im echten Projekt werden sie an den ArenaStore übergeben.</p></section></div>
+<div class="tabpane" id="tab-erkennung" hidden><section class="group"><h3>Erkennungsmodell</h3><div class="modebuttons" data-choice="detector"><button class="active" data-val="objects">🔎 Bodenvergleich (OpenCV)</button><button data-val="world">💬 YOLO-World (Text)</button><button data-val="coco">📦 YOLO11 (COCO)</button></div><p class="hint">Die Auswahl in der Vorschau ändert keine laufende Backend-Erkennung.</p></section><section class="group"><h3>Was gesucht wird</h3><p class="hint" id="detectorHint">Gegenstände, die sich vom Boden abheben. Schatten und verdeckte Teile können die Erkennung stören.</p><div id="promptsWrap" hidden><label>Objektbeschreibungen (eine pro Zeile, Englisch)</label><textarea rows="4">toy robot
+small vehicle</textarea></div></section><section class="group"><h3>Fahrzeuge im Spielfeld</h3><label>Genau <span id="maxVehiclesValue">2</span> Fahrzeuge</label><input type="range" min="1" max="16" value="2" data-out="maxVehiclesValue"><label>Empfindlichkeit <span id="sensitivityValue">3.0</span></label><input type="range" min="1.5" max="8" step="0.1" value="3" data-out="sensitivityValue"><details><summary>Expertenwerte</summary><label>Modellauflösung <span id="imgszValue">640</span> px</label><input type="range" min="320" max="1280" step="32" value="640" data-out="imgszValue"><label>Jedes <span id="frameValue">2</span>. Bild prüfen</label><input type="range" min="1" max="6" value="2" data-out="frameValue"><label class="checkrow"><input type="checkbox"> Boxen ins Video zeichnen (OBS)</label></details><button class="button-wide" data-backend="Erkennungsparameter übernehmen">Übernehmen</button></section></div>
+<div class="tabpane" id="tab-moderation" hidden><section class="group"><h3>API-Key</h3><input type="password" autocomplete="off" placeholder="OpenAI- oder LiteLLM-Key (Demo speichert nicht)"><button class="button-wide" data-backend="API-Key speichern">Speichern</button><p class="hint">In der Demo wird kein API-Key gespeichert oder übertragen.</p></section><section class="group"><h3>Mikrofon</h3><label>Audioeingang</label><select id="micDevice"><option>Standardmikrofon</option></select><div class="rowbuttons"><button data-backend="Mikrofon starten / stoppen">Mikrofon starten / stoppen</button><button id="rescanMics">Geräte suchen</button></div></section><section class="group"><h3>Wann die KI spricht</h3><div class="switches"><label class="checkrow"><input type="checkbox"> Co-Moderation aktiv</label><label class="checkrow"><input type="checkbox" checked> Regelmäßig kommentieren</label><label class="checkrow"><input type="checkbox" checked> Bei Ringout und Ausscheiden</label><label class="checkrow"><input type="checkbox"> Moderator mitschreiben</label><label class="checkrow"><input type="checkbox"> Direkt antworten</label><label class="checkrow"><input type="checkbox" checked> Stimme automatisch abspielen</label></div><details><summary>Takt und Tempo</summary><label>Kommentarintervall <span id="intervalValue">30</span> Sekunden</label><input type="range" min="10" max="120" step="5" value="30" data-out="intervalValue"><label>Pause nach Moderator <span id="graceValue">500</span> ms</label><input type="range" min="0" max="3000" step="100" value="500" data-out="graceValue"><label>Sprechgeschwindigkeit <span id="speedValue">1</span>×</label><input type="range" min="0.5" max="2" step="0.05" value="1" data-out="speedValue"></details></section><section class="group"><h3>Stimme und Charakter</h3><label>Name</label><input type="text" value="Robo"><label>Stimme</label><select><option>alloy</option><option>ash</option><option>ballad</option><option>coral</option><option>echo</option><option>fable</option><option>nova</option><option>onyx</option><option>sage</option><option>shimmer</option></select><label>System-Prompt: Charakter und Ansprache</label><textarea rows="3" placeholder="Charakter und Tonfall des KI-Moderators"></textarea><details><summary>Größe der Anzeige</summary><label>KI Moderatorin <span id="roboWidthValue">180</span> px</label><input type="range" min="70" max="480" step="2" value="180" data-out="roboWidthValue"><label>Bild des Moderators <span id="cameraWidthValue">180</span> px</label><input type="range" min="60" max="520" step="2" value="180" data-out="cameraWidthValue"></details></section><section class="group"><h3>Verlauf</h3><div class="log">Noch nichts gesagt.</div></section></div>
+<div class="tabpane" id="tab-regeln" hidden><section class="group"><h3>Leben</h3><label>Leben pro Fahrzeug <span id="maxLivesValue">3</span></label><input type="range" min="1" max="9" step="1" value="3" data-out="maxLivesValue"><label>Randtoleranz <span id="marginValue">5</span> %</label><input type="range" min="0" max="12" step="0.5" value="5" data-out="marginValue"><p class="hint">Im Angular-Projekt steuert dieser Bereich die Backend-Spielregeln.</p></section><section class="group"><h3>Spieleranzeige (nur Demo)</h3><label>Player 01 <span id="life1Value">100%</span></label><input type="range" id="life1" min="0" max="100" value="100"><label>Player 02 <span id="life2Value">100%</span></label><input type="range" id="life2" min="0" max="100" value="100"></section><section class="group"><h3>Match</h3><div class="rowbuttons"><button id="resetLives">Leben zurücksetzen</button><button id="resetAgain" class="primary">Neues Match</button></div></section><section class="group"><h3>Alle Meldungen</h3><div class="log">Noch keine Meldungen.</div></section></div>
+</div></div></section><div class="toast" id="toast" role="status"></div></main><script>document.getElementById("settingsMount").append(document.getElementById("panel"));document.getElementById("panel").hidden=false;</script><script>const $=id=>document.getElementById(id);let remaining=60,playing=false,last=0,raf=0,stream=null;
+function display(){ $('timer').textContent=Math.ceil(remaining).toString().padStart(2,'0');$('play').textContent=playing?'Ⅱ':'▶';$('status').textContent=playing?'RUNDE LÄUFT':remaining<=0?'TIME UP':'BEREIT / PAUSE'}
+function tick(now){if(!playing)return;if(last)remaining=Math.max(0,remaining-(now-last)/1000);last=now;display();if(remaining===0){playing=false;display();return}raf=requestAnimationFrame(tick)}
+function pause(){playing=false;cancelAnimationFrame(raf);last=0;display()}
+function reset(){pause();remaining=Number($('duration').value);display()}
+$('play').onclick=()=>{if(playing){pause();return}if(remaining<=0)remaining=Number($('duration').value);playing=true;last=0;raf=requestAnimationFrame(tick);display()};$('playMenu').onclick=()=>{$('play').click()};
+$('menu').onclick=()=>{$('panel').hidden=!$('panel').hidden};$('close').onclick=()=>{$('panel').hidden=true};$('reset').onclick=reset;$('resetAgain').onclick=reset;
+$('duration').oninput=e=>{$('durationValue').textContent=e.target.value;if(!playing){remaining=Number(e.target.value);display()}};
+for(const n of [1,2])$('life'+n).oninput=e=>{$('life'+n+'Value').textContent=e.target.value+'%';$('hp'+n).style.width=e.target.value+'%'};
+$('resetLives').onclick=()=>{for(const n of [1,2]){$('life'+n).value=100;$('life'+n).dispatchEvent(new Event('input'))}};
+async function camera(){if(!navigator.mediaDevices?.getUserMedia){$('hint').textContent='Kamera benötigt HTTPS oder localhost. Bitte lokal über einen Webserver öffnen.';return}try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});$('camera').srcObject=stream;$('fallback').classList.add('hidden')}catch(err){$('hint').textContent='Kamera nicht verfügbar. Bitte Kameraberechtigung prüfen.'}}
+$('cameraButton').onclick=()=>{if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;$('fallback').classList.remove('hidden');$('cameraButton').textContent='📷 Kamera aktivieren'}else{camera();$('cameraButton').textContent='📷 Kamera stoppen'}};
+$('fullscreen').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen?.()};
+document.querySelectorAll('[data-tab]').forEach(button=>button.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(b=>{const active=b===button;b.classList.toggle('active',active);b.setAttribute('aria-current',active?'page':'false')});document.querySelectorAll('.tabpane').forEach(p=>p.hidden=p.id!=='tab-'+button.dataset.tab);document.querySelector('.panel .settings-content').scrollTop=0});
+document.querySelectorAll('[data-out]').forEach(el=>el.oninput=()=>$(el.dataset.out).textContent=el.value);
+document.querySelectorAll('[data-choice]').forEach(g=>g.querySelectorAll('button').forEach(b=>b.onclick=()=>{g.querySelectorAll('button').forEach(c=>c.classList.toggle('active',c===b));if(g.dataset.choice==='detector'){let world=b.dataset.val==='world';$('promptsWrap').hidden=!world;$('detectorHint').textContent=world?'YOLO-World erkennt Objekte anhand englischer Textbeschreibungen.':b.dataset.val==='coco'?'YOLO11 sucht nach vordefinierten COCO-Objektklassen.':'Gegenstände, die sich vom Boden abheben. Schatten und verdeckte Teile können die Erkennung stören.'}}));
+let toastTimeout;function notify(s){$('toast').textContent=s+' – in der HTML-Vorschau nicht mit dem Backend verbunden.';$('toast').style.display='block';clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').style.display='none',4000)}
+document.querySelectorAll('[data-backend]').forEach(b=>b.onclick=()=>notify(b.dataset.backend));
+$('showHud').onchange=e=>document.querySelector('.hud').style.visibility=e.target.checked?'visible':'hidden';
+for(const id of ['showArena','showBoxes','showTicker','showCaptions'])$(id).onchange=()=>notify('Anzeigeoption '+id);
+async function devices(type,selectId){if(!navigator.mediaDevices?.enumerateDevices){notify('Geräte suchen');return}try{const ds=await navigator.mediaDevices.enumerateDevices();const sel=$(selectId);sel.innerHTML='<option>Standardgerät</option>';for(const d of ds.filter(x=>x.kind===type)){const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||('Gerät '+(sel.options.length));sel.append(o)}}catch{notify('Geräte konnten nicht geladen werden')}}
+$('rescanCamera').onclick=()=>devices('videoinput','arenaDevice');$('rescanMics').onclick=()=>devices('audioinput','micDevice');
+let corners=[];function startPick(kind){$('panel').hidden=true;corners=[];$('calibration').classList.add('active');$('calibration').dataset.kind=kind;$('calibrationSvg').innerHTML='';notify(kind==='color'?'Im Kamerabild Farbe wählen':'Vier Spielfeldecken auswählen')}
+$('pickColor').onclick=()=>startPick('color');$('pickCorners').onclick=()=>startPick('corners');
+$('calibration').onclick=e=>{const el=$('calibration'),rect=el.getBoundingClientRect();const x=(e.clientX-rect.left)/rect.width*100,y=(e.clientY-rect.top)/rect.height*100;if(el.dataset.kind==='color'){el.classList.remove('active');notify('Farbpunkt ausgewählt');return}corners.push([x,y]);$('calibrationSvg').innerHTML=corners.map(([a,b])=>`<circle cx="${a}" cy="${b}" r="0.65" fill="#f39200" stroke="white" stroke-width="0.3"/>`).join('')+(corners.length>1?`<polyline points="${corners.map(p=>p.join(',')).join(' ')}" fill="none" stroke="#f39200" stroke-width="0.5"/>`:'');if(corners.length===4){setTimeout(()=>{el.classList.remove('active');notify('Vier Ecken ausgewählt')},550)}};
+
+let moderatorStream=null;
+async function toggleModeratorCamera(){
+  if(moderatorStream){moderatorStream.getTracks().forEach(t=>t.stop());moderatorStream=null;$('moderatorVideo').srcObject=null;$('moderatorEmpty').classList.remove('hidden');$('moderatorStatus').textContent='OFFLINE';$('moderatorCameraButton').setAttribute('aria-label','Moderator-Kamera starten');return;}
+  if(!navigator.mediaDevices?.getUserMedia){notify('Moderator-Kamera benötigt HTTPS oder localhost');return;}
+  try{
+    moderatorStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+    $('moderatorVideo').srcObject=moderatorStream;$('moderatorEmpty').classList.add('hidden');$('moderatorStatus').textContent='LIVE';$('moderatorCameraButton').setAttribute('aria-label','Moderator-Kamera stoppen');
+  }catch(err){notify('Moderator-Kamera nicht verfügbar oder Berechtigung verweigert');}
+}
+$('moderatorCameraButton').onclick=toggleModeratorCamera;
+display();document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('panel').hidden=true;$('calibration').classList.remove('active')}if(e.code==='Space'&&!e.target.closest('input,textarea,select,button')){e.preventDefault();$('play').click()}});window.addEventListener('beforeunload',()=>{stream?.getTracks().forEach(t=>t.stop());moderatorStream?.getTracks().forEach(t=>t.stop())});</script><script>
+
+(()=>{
+ const view=document.body.dataset.view;
+ let channel=null;
+ try{channel=new BroadcastChannel('hebocon-fightcam-dual-v1')}catch{}
+ const $=id=>document.getElementById(id);
+ const send=(type,data={})=>{try{channel?.postMessage({type,data})}catch(e){console.warn('Synchronisierung fehlgeschlagen',e)}};
+ if(view==='arena'){
+   const overlay=document.createElement('div');overlay.className='media-overlay';overlay.setAttribute('aria-live','polite');document.body.append(overlay);
+   let mediaTimeout,mediaUrl;
+   function stopMedia(){clearTimeout(mediaTimeout);overlay.replaceChildren();overlay.classList.remove('active');if(mediaUrl){URL.revokeObjectURL(mediaUrl);mediaUrl=null}}
+   function showMedia({name,mime,blob}){
+     stopMedia();if(!blob)return;
+     mediaUrl=URL.createObjectURL(blob);
+     if(mime.startsWith('audio/')){
+       const a=new Audio(mediaUrl);a.volume=.9;a.play().catch(()=>console.warn('Audio wird vom Browser blockiert. Einmal die Kampfansicht anklicken.'));
+       a.onended=stopMedia;mediaTimeout=setTimeout(stopMedia,90000);return;
+     }
+     const el=document.createElement(mime.startsWith('video/')?'video':'img');el.src=mediaUrl;
+     if(el.tagName==='VIDEO'){el.autoplay=true;el.playsInline=true;el.onended=stopMedia;el.play().catch(()=>{});} 
+     overlay.append(el);overlay.classList.add('active');
+     mediaTimeout=setTimeout(stopMedia,mime.startsWith('video/')?30000:6500);
+   }
+   channel?.addEventListener('message',e=>{
+     const {type,data}=e.data||{};
+     if(type==='action'&&data?.id){
+       if(data.id==='reset'){ $('reset')?.click() }
+       else if(data.id==='play'){ $('play')?.click() }
+       else if(data.id==='fullscreen'){ $('fullscreen')?.click() }
+     }
+     if(type==='media')showMedia(data);
+     if(type==='stop-media')stopMedia();
+     if(type==='timer'){const duration=$('duration');if(duration){duration.value=data.seconds;duration.dispatchEvent(new Event('input',{bubbles:true}))}}
+     if(type==='lives'){const el=$('life'+data.player);if(el){el.value=data.value;el.dispatchEvent(new Event('input',{bubbles:true}))}}
+   });
+   setInterval(()=>send('heartbeat',{playing:typeof playing!=='undefined'?playing:false,remaining:typeof remaining!=='undefined'?remaining:0}),1400);
+ }else if(view==='dashboard'){
+   let heartbeat=0;const indicator=$('connection');
+   channel?.addEventListener('message',e=>{if(e.data?.type==='heartbeat'){heartbeat=Date.now();indicator.textContent='● Kampfansicht verbunden';}});
+   setInterval(()=>{if(Date.now()-heartbeat>4000)indicator.textContent='○ Kampfansicht nicht geöffnet'},2000);
+   function action(id){send('action',{id});if(Date.now()-heartbeat>4000)alert('Bitte zuerst die Kampfansicht in einem zweiten Tab oder Fenster öffnen.');}
+
+   // Local microphone capture only; no microphone audio is forwarded to the arena.
+   let micStream=null;
+   let micMuted=true;
+   const micButton=$('dashboardMute');
+   const micFeedback=$('microphoneFeedback');
+   function updateMicControl(){
+     micButton.classList.toggle('is-muted',micMuted);
+     micButton.setAttribute('aria-pressed',String(micMuted));
+     micButton.setAttribute('aria-label',micMuted?'Moderator-Mikrofon aktivieren':'Moderator-Mikrofon stummschalten');
+     micButton.title=micMuted?'Moderator-Mikrofon aktivieren':'Moderator-Mikrofon stummschalten';
+     micButton.textContent=micMuted?'🔇 Mikro stumm':'🎙️ Mikro aktiv';
+     micFeedback.textContent=micMuted?'Mikrofon stumm – die lokale Tonspur ist deaktiviert. Noch keine Übertragung zum Backend.':'Mikrofon lokal aktiviert – zum Stummschalten erneut drücken. Noch keine Übertragung zum Backend.';
+   }
+   micButton.addEventListener('click',async()=>{
+     if(!micStream){
+       if(!navigator.mediaDevices?.getUserMedia){micFeedback.textContent='Mikrofonzugriff benötigt HTTPS oder localhost.';return;}
+       micButton.disabled=true;
+       try{
+         micStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+         micStream.getAudioTracks().forEach(track=>{track.enabled=true;track.addEventListener('ended',()=>{micMuted=true;micStream=null;updateMicControl()});});
+         micMuted=false;
+       }catch(e){micFeedback.textContent='Mikrofon konnte nicht aktiviert werden. Bitte Berechtigungen prüfen.';}
+       finally{micButton.disabled=false;}
+     }else{
+       micMuted=!micMuted;
+       micStream.getAudioTracks().forEach(track=>track.enabled=!micMuted);
+     }
+     if(micStream)updateMicControl();
+   });
+   window.addEventListener('beforeunload',()=>micStream?.getTracks().forEach(t=>t.stop()));
+   $('dashboardPlay').onclick=()=>action('play');$('dashboardReset').onclick=()=>action('reset');$('dashboardKO').onclick=()=>action('ko');
+   $('dashboardStopMedia').onclick=()=>send('stop-media');
+   $('duration')?.addEventListener('input',e=>send('timer',{seconds:Number(e.target.value)}));
+   [1,2].forEach(n=>$('life'+n)?.addEventListener('input',e=>send('lives',{player:n,value:Number(e.target.value)})));
+   const slots=$('boardSlots');const items=[];
+   function addTile(file){
+     const id=items.length;items.push(file);
+     const b=document.createElement('button');b.type='button';b.className='board-tile';
+     const icon=file.type.startsWith('audio/')?'🔊':file.type.startsWith('video/')?'🎬':'🖼️';
+     b.innerHTML='<span class="tile-symbol"></span><strong></strong><small></small>';
+     b.querySelector('.tile-symbol').textContent=icon;b.querySelector('strong').textContent=file.name;
+     b.querySelector('small').textContent='In Übertragung abspielen';b.onclick=()=>{
+       if(Date.now()-heartbeat>4000){alert('Bitte zuerst die Kampfansicht öffnen.');return}
+       send('media',{name:file.name,mime:file.type,blob:file});
+     };
+     slots.prepend(b);
+   }
+   $('boardFiles').onchange=e=>{
+     for(const file of e.target.files){if(file.type.startsWith('audio/')||file.type.startsWith('video/')||file.type.startsWith('image/'))addTile(file)}
+     e.target.value='';
+   };
+   $('boardDemo').onclick=()=>{
+      const ctx=new (window.AudioContext||window.webkitAudioContext)();const oscillator=ctx.createOscillator();const gain=ctx.createGain();
+      oscillator.type='sawtooth';oscillator.frequency.setValueAtTime(260,ctx.currentTime);oscillator.frequency.exponentialRampToValueAtTime(80,ctx.currentTime+.35);
+      gain.gain.setValueAtTime(.15,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.4);
+      oscillator.connect(gain).connect(ctx.destination);oscillator.start();oscillator.stop(ctx.currentTime+.4);oscillator.onended=()=>ctx.close();
+   };
+   // Dashboard local camera should not autostart (this page has no visible arena).
+ }
+})();
+
+</script></body></html>

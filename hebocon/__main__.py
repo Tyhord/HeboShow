@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import os
 import threading
 import time
 
@@ -38,6 +39,10 @@ def main() -> None:
             app.stop()
         return
 
+    # Ohne Klick ins Bühnenfenster blockiert WebView2 sonst Memes mit Ton; die Overscroll-Option
+    # setzt pywebview selbst und ginge durch die Variable verloren.
+    os.environ.setdefault("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+                          "--disable-features=ElasticOverscroll --autoplay-policy=no-user-gesture-required")
     import webview
 
     threading.Thread(target=server.run, name="server", daemon=True).start()

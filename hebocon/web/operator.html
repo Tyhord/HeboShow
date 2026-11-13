@@ -3,140 +3,655 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<title>Hebocon Bedienung</title>
+<!-- Seiten kommen über / und /stage, Module liegen unter /web. -->
+<base href="/web/">
+<title>Hebocon Moderator Control</title>
 <style>
+  :root { font-family: Inter, Arial, sans-serif; color: #fff; background: #090f1b; }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 14px system-ui, sans-serif; background: #111418; color: #e8eaed; display: flex; height: 100vh; }
-  #view { flex: 1; position: relative; background: #000; }
-  canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
-  aside { width: 340px; padding: 14px; overflow-y: auto; border-left: 1px solid #2a2f36; display: flex; flex-direction: column; gap: 12px; }
-  h1 { font-size: 18px; margin: 0; }
-  section { background: #1a1f25; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-  section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #8b949e; margin: 0; }
-  button { background: #2d6cdf; color: #fff; border: 0; border-radius: 6px; padding: 8px 10px; font-weight: 600; cursor: pointer; }
-  button.secondary { background: #30363d; }
-  button.danger { background: #b62324; }
-  button:disabled { opacity: .4; cursor: default; }
-  input { background: #0d1117; color: #e8eaed; border: 1px solid #30363d; border-radius: 6px; padding: 7px; width: 100%; }
-  .row { display: flex; gap: 6px; }
-  .row > * { flex: 1; }
-  #message { background: #20262e; border-left: 4px solid #2d6cdf; padding: 8px; border-radius: 4px; min-height: 40px; }
-  #status { font-size: 12px; color: #8b949e; line-height: 1.6; }
-  .bad { color: #ff7b72; }
-  kbd { background: #30363d; border-radius: 3px; padding: 0 4px; font-size: 11px; }
-  .hp { display: flex; justify-content: space-between; font-weight: 700; font-size: 16px; }
+  body { margin: 0; overflow: auto; background: #090f1b; color: #f2f5fc; }
+  button { cursor: pointer; color: #fff; background: #ffffff17; border: 1px solid #ffffff55; border-radius: 12px; padding: 13px 17px;
+    font: inherit; font-weight: 800; font-size: 16px; }
+  button:hover:not(:disabled) { background: #ad5600; }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid #ffd194; outline-offset: 3px; }
+
+  .dashboard-shell { display: grid; grid-template-columns: minmax(310px, .92fr) minmax(480px, 1.35fr); gap: 20px; min-height: 100dvh;
+    padding: 22px; max-width: 1700px; margin: auto; }
+  .dashboard-heading { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .dashboard-heading h1 { margin: 0; font-size: clamp(24px, 2.5vw, 35px); letter-spacing: .025em; }
+  .dashboard-heading p { margin: 5px 0 0; font-size: 15px; color: #bfcfe0; }
+  .heading-side { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .connection-state { padding: 8px 12px; border-radius: 10px; border: 1px solid #667990; background: #142239; color: #fff; font-size: 14px; }
+  .view-switch { display: inline-flex; align-items: center; padding: 10px 15px; background: #172334e8; color: #fff; border: 1px solid #f39200;
+    border-radius: 12px; font-size: 14px; text-decoration: none; font-weight: 800; box-shadow: 0 5px 22px #0008; }
+  .view-switch:hover, .view-switch:focus-visible { background: #a65300; outline: 3px solid #ffd087; outline-offset: 2px; }
+  .dashboard-panel { background: linear-gradient(145deg, #152238, #0b1221); border: 1px solid #526276; border-radius: 20px;
+    box-shadow: 0 15px 40px #0007; min-width: 0; }
+
+  .soundboard { padding: 22px; align-self: start; position: sticky; top: 20px; }
+  .soundboard h2 { font-size: 22px; margin: 0 0 6px; }
+  .soundboard p { color: #c3d2e1; font-size: 15px; line-height: 1.5; }
+  .dashboard-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .dashboard-tools button { min-height: 45px; }
+  .dashboard-tools button.action { background: #a65300; border-color: #f39200; }
+  .dashboard-tools .ko-trigger { border: 2px solid #ffcd78; background: #8e1e38; color: #fff; min-width: 120px; font-weight: 1000; font-size: 20px; letter-spacing: .07em;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dashboard-tools .ko-trigger.red { border-color: #ff2e88; background: #8e1e38; }
+  .dashboard-tools .ko-trigger.red:hover:not(:disabled) { background: #b32d48; }
+  .dashboard-tools .ko-trigger.blue { border-color: #00e5ff; background: #0b5470; }
+  .dashboard-tools .ko-trigger.blue:hover:not(:disabled) { background: #0f7194; }
+  /* Ladestand als Füllung von unten, damit der Moderator ohne Zahl sieht, wann es soweit ist. */
+  .dashboard-tools .ulti-trigger { --c: #00e5ff; --charge: 0%; border: 2px solid var(--c); font-size: 22px;
+    background: linear-gradient(to top, color-mix(in srgb, var(--c) 45%, transparent) var(--charge), #10131b var(--charge)); }
+  .dashboard-tools .ulti-trigger.red { --c: #ff2e88; }
+  .dashboard-tools .ulti-trigger.ready { animation: ulti-ready .7s ease-in-out infinite alternate; }
+  .dashboard-tools .ulti-trigger.used { opacity: .35; text-decoration: line-through; }
+  @keyframes ulti-ready { to { box-shadow: 0 0 18px var(--c); filter: brightness(1.4); } }
+  .sound-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 15px 0 20px; }
+  .sound-actions label { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; border: 1px solid #f39200;
+    border-radius: 12px; background: #a65300; padding: 12px 15px; cursor: pointer; }
+  .sound-actions label:focus-within { outline: 3px solid #ffd087; outline-offset: 3px; }
+  .sound-actions input { width: 0; height: 0; opacity: 0; position: absolute; }
+  .board-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .board-tile { min-height: 118px; padding: 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; justify-content: center;
+    text-align: left; background: #17263b; border: 1px solid #65758d; border-radius: 16px; overflow-wrap: anywhere; font-weight: 400; }
+  .board-tile:hover:not(:disabled) { background: #34445b; }
+  .board-tile .tile-symbol { font-size: 27px; }
+  .board-tile strong { font-size: 16px; }
+  .board-tile small { font-size: 13px; color: #c7d7e9; }
+  .board-tile.is-empty { border-style: dashed; border-color: #76889b; color: #c8d6e9; cursor: default; }
+  /*noinspection CssUnusedSymbol*/
+  .tile-wrap { position: relative; }
+  /*noinspection CssUnusedSymbol*/
+  .tile-wrap .board-tile { width: 100%; height: 100%; padding-right: 44px; }
+  /*noinspection CssUnusedSymbol*/
+  .tile-rename { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 8px; font-size: 15px; }
+  /*noinspection CssUnusedSymbol*/
+  .tile-remove { top: 46px; }
+  /*noinspection CssUnusedSymbol*/
+  .tile-name-edit { position: absolute; left: 10px; right: 10px; bottom: 10px; font-size: 15px; }
+  .board-footer { margin-top: 17px; padding: 13px; border-radius: 12px; background: #0d1828; border: 1px solid #43546b; color: #dce7f5;
+    font-size: 14px; line-height: 1.5; }
+
+  .dashboard-settings { padding: 0; overflow: hidden; min-height: 620px; height: calc(100dvh - 120px); position: sticky; top: 20px; }
+  .panel { display: flex; flex-direction: column; height: 100%; }
+  .panel h2 { flex: none; margin: 0; padding: 23px 24px 17px; border-bottom: 1px solid #ffffff1c; font-size: 20px; font-weight: 900;
+    letter-spacing: .045em; line-height: 1.4; text-transform: uppercase; color: #f7f9ff; }
+  .settings-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 165px minmax(0, 1fr); overflow: hidden; }
+  .settings-tabs { padding: 14px 9px; border-right: 1px solid #ffffff1c; display: flex; flex-direction: column; gap: 4px;
+    background: #060b1555; overflow-y: auto; min-height: 0; }
+  .settings-tabs button { border: 1px solid transparent; background: transparent; text-align: left; border-radius: 10px; padding: 12px 11px;
+    font-size: 15px; font-weight: 700; line-height: 1.35; min-height: 47px; }
+  .settings-tabs button:hover { background: #ffffff16; }
+  /*noinspection CssUnusedSymbol*/
+  .settings-tabs button.active { background: #f3920026; border-color: #f39200; color: #ffd194; }
+  .settings-content { min-width: 0; height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 12px 23px 24px; }
+  .feedback { margin: 0 0 12px; padding: 10px 12px; background: #101e31; border-left: 3px solid #f39200; border-radius: 8px; color: #f1f5fc;
+    font-size: 14px; line-height: 1.5; min-height: 44px; }
+  .preview { position: relative; height: clamp(220px, 40dvh, 460px); border-radius: 13px; overflow: hidden; border: 2px solid #b8c9d9;
+    background: radial-gradient(ellipse at center, #263e51, #080b13 80%); box-shadow: 0 10px 30px #000b, inset 0 0 20px #0007; }
+  .preview canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+  .preview-meta { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; gap: 4px; padding: 20px 11px 8px;
+    background: linear-gradient(transparent, #070b14e8); font-size: 12px; font-weight: 800; letter-spacing: .06em; pointer-events: none; }
+  .dot { display: inline-block; background: #f39200; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  section.group { margin: 12px 0 22px; border-bottom: 1px solid #ffffff1b; padding-bottom: 17px; }
+  .panel h3 { font-size: 16px; letter-spacing: .035em; line-height: 1.4; text-transform: uppercase; margin: 8px 0 16px; color: #f1f5ff; }
+  .hint { color: #c2d1e5; font-size: 14px; line-height: 1.55; margin: 9px 0 14px; }
+  .panel label { display: block; font-size: 15px; line-height: 1.5; font-weight: 700; color: #d3deeb; margin: 16px 0 11px; }
+  .panel input[type=text] { width: 100%; background: #080e1c; color: #edf3ff; border: 1px solid #8fa6c2; border-radius: 9px; padding: 10px;
+    min-height: 44px; font: inherit; font-size: 16px; }
+  .rowbuttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  .rowbuttons button, .button-wide { font-size: 14px; min-height: 44px; line-height: 1.35; padding: 10px 12px; font-weight: 700; }
+  .button-wide { width: 100%; margin-top: 12px; background: #a65300; border-color: #f39200; }
+  button.icon { min-width: 52px; font-size: 22px; line-height: 1; padding: 10px 14px; }
+  .checkrow { display: flex !important; align-items: center; gap: 11px; margin: 12px 0 !important; font-weight: 600 !important; color: #d5dfeb; cursor: pointer; }
+  .checkrow input { margin: 0; width: 19px; height: 19px; accent-color: #f39200; }
+  .log { background: #050b13a6; border: 1px solid #ffffff20; padding: 10px; border-radius: 9px; font-size: 14px; line-height: 1.55; color: #bdc9d9; }
+  .fight-clock { font-size: clamp(35px, 4vw, 56px); font-weight: 1000; text-align: center; line-height: .9; font-variant-numeric: tabular-nums;
+    text-shadow: 0 3px 0 #a55b00, 0 6px 12px #000; }
+  .fight-clock small { display: block; margin-top: 10px; font-size: 10px; letter-spacing: .28em; color: #cdd9e8; text-shadow: none; font-weight: 400; }
+  .hp-row { display: flex; justify-content: space-between; font-weight: 800; font-size: 15px; margin-top: 12px; }
+  .hp-bar { height: 12px; padding: 2px; background: #10131bc9; border: 2px solid #d9e4f2; margin: 6px 0 4px; }
+  .hp-bar div { height: 100%; transition: width .3s; }
+  .bad { color: #ff8794; }
+
+  dialog { color: #f2f5fc; background: linear-gradient(145deg, #152238, #0b1221); border: 1px solid #526276; border-radius: 20px;
+    box-shadow: 0 20px 60px #000c; padding: 20px 22px; max-width: min(860px, 96vw); }
+  dialog::backdrop { background: #03070fcc; }
+  dialog h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: .045em; text-transform: uppercase; }
+  dialog .hint { color: #c2d1e5; font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
+  .profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .profile { --robot: #8fa6c2; margin: 0; min-width: 0; border: 2px solid var(--robot); border-radius: 14px; padding: 12px 14px 14px; }
+  .profile[data-robot="1"] { --robot: #00e5ff; }
+  .profile[data-robot="2"] { --robot: #ff2e88; }
+  .profile legend { padding: 0 6px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--robot); }
+  .profile label { display: block; margin: 9px 0 0; font-size: 13px; font-weight: 700; color: #d3deeb; }
+  .profile input[type=text] { display: block; width: 100%; margin-top: 4px; background: #080e1c; color: #edf3ff; border: 1px solid #8fa6c2;
+    border-radius: 9px; padding: 8px 10px; min-height: 40px; font: inherit; font-size: 15px; }
+  .profile input:disabled { opacity: .55; }
+  .profile .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .photo-row { display: flex; gap: 10px; align-items: center; }
+  /* Schachbrett zeigt, ob das Bild wirklich einen transparenten Hintergrund hat. */
+  .photo-box { flex: none; width: 96px; height: 96px; display: grid; place-items: center; border-radius: 10px; border: 1px solid #65758d;
+    font-size: 12px; color: #c8d6e9; text-align: center;
+    background: repeating-conic-gradient(#ffffff14 0 25%, transparent 0 50%) 0 0 / 16px 16px, #0d1828; }
+  .photo-box img { width: 100%; height: 100%; object-fit: contain; }
+  .photo-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  .photo-buttons label, .photo-buttons button { margin: 0; display: inline-flex; align-items: center; min-height: 44px; padding: 8px 12px;
+    font-size: 20px; border-radius: 12px; border: 1px solid #ffffff55; background: #ffffff17; cursor: pointer; color: #fff; }
+  .photo-buttons label:hover { background: #ad5600; }
+  .photo-buttons label:focus-within { outline: 3px solid #ffd087; outline-offset: 3px; }
+  .photo-buttons input { width: 0; height: 0; opacity: 0; position: absolute; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .vs-frame { width: 640px; max-width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; border: 2px solid #b8c9d9; background: #050a11; }
+  /* Die Bühne rendert in fester Größe und wird verkleinert, damit die Vorschau genau wie die echte Ansicht aussieht. */
+  .vs-frame iframe { width: 1280px; height: 720px; border: 0; transform: scale(.5); transform-origin: 0 0; pointer-events: none; }
   [hidden] { display: none !important; }
+  @media (max-width: 900px) {
+    .dashboard-shell { grid-template-columns: 1fr; padding: 14px; }
+    .soundboard, .dashboard-settings { position: static; }
+    .dashboard-settings { height: 720px; min-height: 0; }
+    .board-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 580px) {
+    .board-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .settings-layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+    .settings-tabs { flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid #ffffff22; padding: 8px; }
+    .settings-tabs button { white-space: nowrap; font-size: 14px; min-height: 44px; }
+    .dashboard-heading h1 { font-size: 25px; }
+  }
 </style>
 </head>
 <body>
-<div id="view"><canvas id="c"></canvas></div>
-<aside>
-  <h1>Hebocon Bedienung</h1>
-  <div id="message"></div>
-  <div id="status"></div>
-
-  <section>
-    <h2>Kamera</h2>
-    <div class="row"><input id="source" placeholder="0, rtsp://… oder Datei"><button id="camera" class="secondary" style="flex:0">Übernehmen</button></div>
-  </section>
-
-  <section id="arenaBox">
-    <h2>Arena (einmal pro Sitzung)</h2>
-    <button id="corners" class="secondary">Ecken neu setzen</button>
-    <button id="scan">Arena scannen (muss leer sein)</button>
-  </section>
-
-  <section id="battleBox">
-    <h2>Kampf</h2>
-    <button id="newBattle">Neuer Kampf <kbd>N</kbd></button>
-    <div id="regBox" hidden>
-      <div id="regTitle" style="font-weight:700;margin-bottom:6px"></div>
-      <div class="row"><button id="detect">Erkennen <kbd>D</kbd></button><button id="retry" class="secondary">Nochmal <kbd>R</kbd></button></div>
-      <div style="font-size:12px;color:#8b949e;margin:6px 0">Linksklick ins Bild: Fläche dazu. Rechtsklick: Fläche weg.</div>
-      <input id="name" placeholder="Name des Roboters">
-      <button id="confirm" style="margin-top:6px;width:100%">Bestätigen <kbd>Enter</kbd></button>
+<div class="dashboard-shell">
+  <header class="dashboard-heading">
+    <div><h1>MODERATOR CONTROL</h1><p>Hebocon · Einstellungen &amp; Mediensteuerung</p></div>
+    <div class="heading-side">
+      <span class="connection-state" id="conn" role="status">○ App offline</span>
+      <a class="view-switch" href="/stage" target="_blank" rel="noopener">↗ Kampfansicht öffnen</a>
     </div>
-    <button id="start" hidden>Start <kbd>S</kbd></button>
-    <div id="fightBox" hidden>
-      <div id="hp"></div>
-      <div class="row" style="margin-top:6px"><button id="obstacle" class="secondary">Hindernis <kbd>O</kbd></button><button id="powerup" class="secondary">Power-up <kbd>P</kbd></button></div>
+  </header>
+
+  <section class="soundboard dashboard-panel" aria-label="Soundboard und Meme-Board">
+    <h2>🎛️ Meme- &amp; Soundboard</h2>
+    <p>Bleibt sichtbar, während du rechts zwischen den Einstellungen wechselst. Medien erscheinen kurz in der Kampfansicht.</p>
+    <div class="dashboard-tools">
+      <button id="start" type="button" class="action icon" title="Kampf starten (S)">▶</button>
+      <button id="next" type="button" class="icon" title="Neuer Kampf (N)">↻</button>
+      <button id="ko1" type="button" class="ko-trigger blue" title="K.O. für Roboter 1: HP auf 0, K.O. in Blau">K.O.</button>
+      <button id="ko2" type="button" class="ko-trigger red" title="K.O. für Roboter 2: HP auf 0, K.O. in Rot">K.O.</button>
+      <button id="ulti1" type="button" class="icon ulti-trigger blue" title="Laser-Ulti für Roboter 1 (1)">⚡</button>
+      <button id="ulti2" type="button" class="icon ulti-trigger red" title="Laser-Ulti für Roboter 2 (2)">⚡</button>
+      <button id="vs" type="button" class="icon" aria-haspopup="dialog" title="Roboter-Steckbriefe für den VS-Bildschirm">⚔</button>
+      <button id="shrink" type="button" class="icon" title="Arena schrumpfen: in 30 s auf die halbe Fläche (K)">⇲</button>
+      <button id="stopMedia" type="button" class="icon" title="Alle Medien stoppen">⏹</button>
     </div>
-    <button id="abort" class="danger" hidden>Kampf abbrechen</button>
+    <div class="sound-actions">
+      <label title="Medien hinzufügen: Audio, Bild oder Video">＋ <input id="files" type="file" accept="audio/*,image/*,video/*,.mp4,.m4v,.webm,.mov,.mkv,.mp3,.wav,.ogg,.m4a,.aac,.flac,.opus,.gif" multiple aria-label="Medien hinzufügen: Audio-, Bild- oder Videodateien auswählen"></label>
+    </div>
+    <div id="board" class="board-grid">
+      <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erster Sound</strong><small>Audio hochladen</small></div>
+      <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erstes Meme</strong><small>Bild oder Video hochladen</small></div>
+    </div>
+    <div class="board-footer">Hochgeladene Dateien bleiben auch nach einem Neustart erhalten. Mehrere Memes laufen gleichzeitig in den Ecken der Kampfansicht; ✎ benennt eine Kachel um, 🗑 löscht sie.</div>
   </section>
-</aside>
+
+  <section class="dashboard-settings dashboard-panel" aria-label="Einstellungen">
+    <div class="panel">
+      <h2>⚙ Einstellungen</h2>
+      <div class="settings-layout">
+        <nav class="settings-tabs" id="tabs" aria-label="Einstellungsbereiche">
+          <button data-tab="steuerung">🎮 Steuerung</button>
+          <button data-tab="kamera">📷 Kamera</button>
+          <button data-tab="spielfeld">🔳 Spielfeld</button>
+          <button data-tab="roboter">🤖 Roboter</button>
+        </nav>
+        <div class="settings-content">
+          <p class="feedback" id="message" role="status" aria-live="polite"></p>
+          <div class="preview" id="preview">
+            <canvas id="c"></canvas>
+            <div class="preview-meta"><span><span class="dot"></span><span id="viewTitle">KAMERABILD</span></span><span id="previewInfo"></span></div>
+          </div>
+
+          <div class="tabpane" data-pane="steuerung">
+            <section class="group">
+              <h3>Kampfsteuerung</h3>
+              <div class="fight-clock" id="timer">00:00<small>KAMPFZEIT</small></div>
+              <div id="hp"></div>
+              <div class="rowbuttons">
+                <button id="obstacle" type="button" class="icon" title="Hindernis spawnen (O)">☠</button>
+                <button id="powerup" type="button" class="icon" title="Power-up spawnen (P)">✚</button>
+                <button id="abort" type="button" class="icon" title="Kampf abbrechen">⛔</button>
+              </div>
+            </section>
+            <section class="group">
+              <h3>Anzeigeoptionen</h3>
+              <label class="checkrow"><input type="checkbox" id="hud" checked> Lebensleisten &amp; Timer</label>
+              <p class="hint">Blendet Lebensleisten, Kampfzeit und Statuszeilen in der Kampfansicht aus, etwa für Ansagen.</p>
+            </section>
+          </div>
+
+          <div class="tabpane" data-pane="kamera">
+            <section class="group">
+              <h3>Kamera für das Spielfeld</h3>
+              <label for="source">Kameraquelle</label>
+              <input type="text" id="source" placeholder="0, rtsp://… oder https://vdo.ninja/…">
+              <p class="hint">Kameranummer, Stream-Adresse oder VDO.Ninja-Link.</p>
+              <button id="camera" type="button" class="button-wide icon" title="Kameraquelle übernehmen">✔</button>
+            </section>
+            <section class="group">
+              <h3>Technik-Status</h3>
+              <div class="log" id="status"></div>
+            </section>
+          </div>
+
+          <div class="tabpane" data-pane="spielfeld">
+            <section class="group">
+              <h3>Manuelle Kalibrierung</h3>
+              <p class="hint">Die vier Ecken der Arena oben im Bild anklicken, Reihenfolge egal. Ab dann sieht die App nur noch die Arena.
+                Esc fängt neu an.</p>
+              <button id="resetArena" type="button" class="button-wide icon" title="Ecken neu setzen">⬚</button>
+            </section>
+          </div>
+
+          <div class="tabpane" data-pane="roboter">
+            <section class="group">
+              <h3>Roboter aufstellen</h3>
+              <p class="hint">Beide Roboter in die Arena stellen; sie werden automatisch erkannt.
+                Falsch zugeordnet? <b>Linksklick</b> auf Roboter 1, <b>Rechtsklick</b> auf Roboter 2.</p>
+              <label for="name1">Name Roboter 1</label>
+              <input type="text" id="name1" placeholder="Roboter 1" style="border-color:#00e5ff">
+              <label for="name2">Name Roboter 2</label>
+              <input type="text" id="name2" placeholder="Roboter 2" style="border-color:#ff2e88">
+              <button id="startWide" type="button" class="button-wide" title="Kampf starten (S)">▶</button>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<dialog id="profiles" aria-labelledby="profilesTitle">
+  <h2 id="profilesTitle">⚔ Roboter-Steckbriefe</h2>
+  <p class="hint">Erscheinen auf dem VS-Bildschirm nach dem Intro. Änderungen gelten sofort. Bilder am besten als PNG mit
+    transparentem Hintergrund; ohne Bild zeigt der VS-Bildschirm den Live-Ausschnitt aus der Kamera.</p>
+  <div class="profile-grid" id="profileGrid"></div>
+  <div class="dialog-actions">
+    <button id="previewVs" type="button" class="icon" title="Vorschau des VS-Bildschirms">👁</button>
+    <button id="closeProfiles" type="button" class="icon" title="Schließen">✔</button>
+  </div>
+</dialog>
+
+<template id="profileTemplate">
+  <fieldset class="profile">
+    <legend></legend>
+    <div class="photo-row">
+      <div class="photo-box"><img alt="" hidden><span>Kein Bild</span></div>
+      <div class="photo-buttons">
+        <label title="Bild wählen">🖼<input type="file" accept="image/png,image/webp,image/gif,image/jpeg"></label>
+        <button type="button" class="clear-photo" title="Bild entfernen">✕</button>
+      </div>
+    </div>
+    <label>Name <input type="text" name="name" maxlength="40"></label>
+    <label>Team <input type="text" name="team" maxlength="40"></label>
+    <div class="pair">
+      <label>Gewicht <input type="text" name="weight" maxlength="20" placeholder="z. B. 850 g"></label>
+      <label>Höhe <input type="text" name="height" maxlength="20" placeholder="z. B. 25 cm"></label>
+    </div>
+    <label>Slogan (optional) <input type="text" name="slogan" maxlength="80"></label>
+  </fieldset>
+</template>
+
+<dialog id="vsPreview" aria-labelledby="vsPreviewTitle">
+  <h2 id="vsPreviewTitle">👁 Vorschau VS-Bildschirm</h2>
+  <p class="hint">Standbild ohne Animation; die Kampfansicht bleibt unverändert.</p>
+  <div class="vs-frame"><iframe id="vsFrame" title="Vorschau des VS-Bildschirms" tabindex="-1"></iframe></div>
+  <div class="dialog-actions">
+    <button id="closePreview" type="button" class="icon" title="Vorschau schließen">✔</button>
+  </div>
+</dialog>
 <script type="module">
-import { COLORS, act, connect, fit, hotkeys, pathPoly, resizeCanvas, toCanvas, toFrame } from "/web/common.js";
+import { COLORS, act, connect, drawFrame, fit, hotkeys, pathPoly, resizeCanvas, toCanvas, toFrame } from "./common.js";
 
-const $ = (id) => document.getElementById(id);
-const canvas = $("c");
+const byId = (id) => document.getElementById(id);
+const canvas = byId("c");
 const ctx = canvas.getContext("2d");
 let state = null;
 let frame = null;
 let view = null;
-let cornerMode = false;
 let corners = [];
+let lastPacket = 0;
+// Der Reiter folgt dem Ablauf; ein Klick auf einen Reiter gilt, bis der Ablauf weiterspringt.
+let picked = null;
+let lastAuto = null;
+const LIVE = ["intro", "ready", "countdown", "fight", "finished"];
 
 async function run(name, data) {
   const res = await act(name, data);
-  if (!res.ok) $("message").textContent = res.message;
+  if (!res.ok) byId("message").textContent = res.message;
 }
 
-$("camera").onclick = () => run("camera", { source: $("source").value.trim() });
-$("corners").onclick = () => { cornerMode = true; corners = []; };
-$("scan").onclick = () => run("scan");
-$("newBattle").onclick = () => run("new_battle");
-$("detect").onclick = () => run("detect");
-$("retry").onclick = () => run("retry");
-$("confirm").onclick = () => { run("confirm", { name: $("name").value }); $("name").value = ""; };
-$("start").onclick = () => run("start");
-$("obstacle").onclick = () => run("spawn", { kind: "obstacle" });
-$("powerup").onclick = () => run("spawn", { kind: "powerup" });
-$("abort").onclick = () => run("abort");
-hotkeys(() => { const n = $("name").value; $("name").value = ""; return n; });
-window.addEventListener("keydown", (e) => { if (e.key === "Escape") { cornerMode = false; corners = []; } });
+const names = () => [byId("name1").value, byId("name2").value];
+// Symbol-Knöpfe brauchen einen sprechenden Namen für Screenreader; der Tooltip liefert ihn gleich mit.
+function tip(el, text) {
+  if (el.title === text) return;
+  el.title = text;
+  el.setAttribute("aria-label", text);
+}
+document.querySelectorAll("button[title]").forEach((b) => b.setAttribute("aria-label", b.title));
+const start = () => run("start", { names: names() });
+byId("start").onclick = byId("startWide").onclick = start;
+byId("next").onclick = () => run("new_battle");
+byId("ko1").onclick = () => run("ko", { player: 1 });
+byId("ko2").onclick = () => run("ko", { player: 2 });
+byId("ulti1").onclick = () => run("ulti", { player: 1 });
+byId("ulti2").onclick = () => run("ulti", { player: 2 });
+byId("stopMedia").onclick = () => run("cue", { kind: "stop" });
+byId("camera").onclick = () => run("camera", { source: byId("source").value.trim() });
+byId("resetArena").onclick = () => { corners = []; run("reset_arena"); };
+byId("obstacle").onclick = () => run("spawn", { kind: "obstacle" });
+byId("powerup").onclick = () => run("spawn", { kind: "powerup" });
+byId("shrink").onclick = () => run("shrink");
+byId("abort").onclick = () => run("abort");
+byId("hud").onchange = (e) => run("hud", { on: e.target.checked });
+document.querySelectorAll("#tabs button").forEach((b) => {
+  b.onclick = () => { picked = b.dataset.tab; if (state) ui(state); };
+});
+hotkeys(names);
+window.addEventListener("keydown", (e) => { if (e.key === "Escape") corners = []; });
 
-function click(e, positive) {
+const ICON = { audio: "🔊", video: "🎬", image: "🖼️" };
+
+// Windows liefert für manche Endungen (mkv, mov, m4a …) keinen Typ, dann raten wir über die Endung.
+const MIME = {
+  mp4: "video/mp4", m4v: "video/mp4", webm: "video/webm", mov: "video/mp4", mkv: "video/webm",
+  ogv: "video/ogg", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", oga: "audio/ogg",
+  m4a: "audio/mp4", aac: "audio/aac", flac: "audio/flac", opus: "audio/ogg", gif: "image/gif",
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
+};
+
+async function upload(file, mime, board = false) {
+  try {
+    const name = board ? file.name.replace(/\.[^.]+$/, "") : file.name;
+    const r = await fetch("/media", {
+      method: "POST", body: file,
+      headers: { "Content-Type": mime, "X-Name": encodeURIComponent(name), "X-Board": board ? "1" : "0" },
+    });
+    return await r.json();
+  } catch {
+    return { ok: false, message: `${file.name}: Hochladen fehlgeschlagen. Datei zu groß (max. 100 MB) oder Server nicht erreichbar.` };
+  }
+}
+
+const PROFILE_FIELDS = ["name", "team", "weight", "height", "slogan"];
+const profileSets = [1, 2].map((id) => {
+  const set = byId("profileTemplate").content.firstElementChild.cloneNode(true);
+  set.dataset.robot = String(id);
+  set.querySelector("legend").textContent = `Roboter ${id}`;
+  set.elements.namedItem("name").placeholder = `Roboter ${id}`;
+  set.addEventListener("change", (e) => { if (e.target.type === "text") saveProfile(id); });
+  set.querySelector("input[type=file]").onchange = async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const mime = file.type || MIME[file.name.split(".").pop().toLowerCase()] || "";
+    if (!mime.startsWith("image/")) {
+      byId("message").textContent = `${file.name}: Kein Bild. Bitte PNG (am besten transparent), WebP, GIF oder JPG wählen.`;
+      return;
+    }
+    const res = await upload(file, mime);
+    if (!res.ok) { byId("message").textContent = res.message; return; }
+    showPhoto(set, res.url);
+    saveProfile(id);
+  };
+  set.querySelector(".clear-photo").onclick = () => { showPhoto(set, ""); saveProfile(id); };
+  set.querySelectorAll("[title]").forEach((el) => el.setAttribute("aria-label", el.title));
+  byId("profileGrid").append(set);
+  return set;
+});
+
+function showPhoto(set, url) {
+  set.dataset.image = url;
+  const img = set.querySelector(".photo-box img");
+  img.hidden = !url;
+  if (url) img.src = url;
+  else img.removeAttribute("src");
+  set.querySelector(".photo-box span").hidden = Boolean(url);
+  set.querySelector(".clear-photo").disabled = !url;
+}
+
+function saveProfile(id) {
+  const set = profileSets[id - 1];
+  const data = { player: id, image: set.dataset.image || "" };
+  for (const f of PROFILE_FIELDS) data[f] = set.elements.namedItem(f).value.trim();
+  // Das Namensfeld im Panel bleibt die Quelle für Start, sonst überschreibt Start den Steckbrief-Namen.
+  if (!set.elements.namedItem("name").disabled) byId("name" + id).value = data.name;
+  return run("profile", data);
+}
+
+byId("vs").onclick = () => {
+  const live = LIVE.includes(state?.phase);
+  profileSets.forEach((set, i) => {
+    const profile = state?.profiles?.[i] || {};
+    const name = set.elements.namedItem("name");
+    // Im laufenden Kampf hängen Namen an HP-Anzeige und Ergebnis; das Backend ignoriert sie dann ohnehin.
+    name.value = live ? state?.names?.[i] || "" : byId("name" + (i + 1)).value;
+    name.disabled = live;
+    for (const f of PROFILE_FIELDS.slice(1)) set.elements.namedItem(f).value = profile[f] || "";
+    showPhoto(set, profile.image || "");
+  });
+  byId("profiles").showModal();
+};
+byId("closeProfiles").onclick = () => byId("profiles").close();
+byId("previewVs").onclick = async () => {
+  await Promise.all([saveProfile(1), saveProfile(2)]);
+  byId("vsFrame").src = `/stage?preview=${Date.now()}`;
+  byId("vsPreview").showModal();
+};
+byId("closePreview").onclick = () => byId("vsPreview").close();
+// Leere Seite beendet die Websocket-Verbindung der Vorschau.
+byId("vsPreview").onclose = () => { byId("vsFrame").src = "about:blank"; };
+// Tippen im Dialog darf keine Tastenkürzel wie Start oder Hindernis auslösen.
+for (const d of document.querySelectorAll("dialog")) d.addEventListener("keydown", (e) => e.stopPropagation());
+
+async function addMedia(file) {
+  const mime = file.type || MIME[file.name.split(".").pop().toLowerCase()] || "";
+  if (!ICON[mime.split("/")[0]]) {
+    byId("message").textContent = `${file.name}: Format nicht unterstützt. Bitte MP4, WebM, MP3, WAV, GIF, PNG oder JPG wählen.`;
+    return;
+  }
+  const res = await upload(file, mime, true);
+  if (!res.ok) { byId("message").textContent = res.message; return; }
+  byId("board").prepend(addTile(res));
+}
+
+function addTile(media) {
+  const tile = document.createElement("button");
+  tile.type = "button";
+  tile.className = "board-tile";
+  tile.innerHTML = '<span class="tile-symbol"></span><strong></strong><small>In Kampfansicht abspielen</small>';
+  tile.querySelector(".tile-symbol").textContent = ICON[media.mime.split("/")[0]] || "▶";
+  const label = tile.querySelector("strong");
+  label.textContent = media.name;
+  tile.onclick = () => run("cue", { kind: "media", media: { ...media, name: label.textContent } });
+  const wrap = document.createElement("div");
+  wrap.className = "tile-wrap";
+  const rename = document.createElement("button");
+  rename.type = "button";
+  rename.className = "tile-rename";
+  rename.title = "Umbenennen";
+  rename.setAttribute("aria-label", "Kachel umbenennen");
+  rename.textContent = "✎";
+  rename.onclick = () => renameTile(wrap, label, media.url);
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "tile-rename tile-remove";
+  remove.title = "Löschen";
+  remove.setAttribute("aria-label", "Kachel löschen");
+  remove.textContent = "🗑";
+  remove.onclick = async () => {
+    if (!confirm(`„${label.textContent}“ endgültig löschen?`)) return;
+    await fetch(media.url, { method: "DELETE" });
+    wrap.remove();
+  };
+  wrap.append(tile, rename, remove);
+  document.querySelectorAll("#board .is-empty").forEach((el) => el.remove());
+  return wrap;
+}
+
+async function loadBoard() {
+  try {
+    const list = await (await fetch("/media")).json();
+    byId("board").append(...list.map(addTile));
+  } catch {
+    byId("message").textContent = "Soundboard konnte nicht geladen werden. Seite neu laden.";
+  }
+}
+loadBoard();
+
+function renameTile(wrap, label, url) {
+  if (wrap.querySelector("input")) return;
+  const input = document.createElement("input");
+  input.className = "tile-name-edit";
+  input.value = label.textContent;
+  input.setAttribute("aria-label", "Neuer Name");
+  const done = (save) => {
+    // Entfernen löst blur aus; ohne Sperre würde Escape doch speichern.
+    if (!input.isConnected) return;
+    const name = input.value.trim();
+    input.remove();
+    if (save && name && name !== label.textContent) {
+      label.textContent = name;
+      fetch(url, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+    }
+  };
+  input.onkeydown = (e) => {
+    // Sonst löst Enter über die globalen Tastenkürzel den Kampfstart aus.
+    e.stopPropagation();
+    if (e.key === "Enter") done(true);
+    else if (e.key === "Escape") done(false);
+  };
+  input.onblur = () => done(true);
+  wrap.append(input);
+  input.focus();
+  input.select();
+}
+byId("files").onchange = async (e) => {
+  for (const file of e.target.files) await addMedia(file);
+  e.target.value = "";
+};
+
+function click(e, slot) {
   e.preventDefault();
   if (!view || !state?.frame) return;
   const r = canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
   const [x, y] = toFrame(view, (e.clientX - r.left) * dpr, (e.clientY - r.top) * dpr);
   if (x < 0 || y < 0 || x > state.frame.w || y > state.frame.h) return;
-  if (cornerMode) {
+  if (state.phase === "arena") {
     corners.push([x, y]);
     if (corners.length === 4) {
-      cornerMode = false;
       run("corners", { points: corners });
       corners = [];
     }
   } else if (state.phase === "register") {
-    run("click", { x, y, positive });
+    run("pick", { x, y, slot });
   }
 }
-canvas.addEventListener("click", (e) => click(e, true));
-canvas.addEventListener("contextmenu", (e) => click(e, false));
+canvas.addEventListener("click", (e) => click(e, 1));
+canvas.addEventListener("contextmenu", (e) => click(e, 2));
+
+function autoTab(s) {
+  if (s.camera.error || !s.frame) return "kamera";
+  if (s.phase === "arena") return "spielfeld";
+  if (s.phase === "register") return "roboter";
+  return "steuerung";
+}
+
+const VIEW_TITLE = { arena: "KAMERABILD · ECKEN ANKLICKEN", register: "ARENA · ROBOTER ZUORDNEN",
+  intro: "ARENA · INTRO LÄUFT", ready: "ARENA · VS-BILDSCHIRM", countdown: "ARENA · COUNTDOWN",
+  fight: "ARENA · KAMPF", finished: "ARENA · KAMPF BEENDET" };
+
+function clock(sec) {
+  const t = Math.floor(sec || 0);
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+}
 
 function ui(s) {
-  $("message").textContent = cornerMode
-    ? `Ecke ${corners.length + 1} von 4 anklicken (Esc bricht ab).`
+  const auto = autoTab(s);
+  if (auto !== lastAuto) { picked = null; lastAuto = auto; }
+  const tab = picked ?? auto;
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".tabpane").forEach((el) => { el.hidden = el.dataset.pane !== tab; });
+  byId("viewTitle").textContent = VIEW_TITLE[s.phase] || "KAMERABILD";
+  byId("previewInfo").textContent = s.tracking.fps ? `${s.tracking.fps} FPS · ${s.tracking.latency_ms} MS` : "";
+
+  byId("message").textContent = s.phase === "arena" && s.frame
+    ? `Ecke ${corners.length + 1} von 4 im Bild anklicken (Esc fängt neu an).`
     : (s.busy ? `⏳ ${s.busy} … ` : "") + (s.message || "");
-  const cam = s.camera.error ? `<span class="bad">${s.camera.error}</span>` : `Kamera ${s.camera.source}: ${s.camera.fps} fps`;
-  const model = s.model.error ? `<span class="bad">${s.model.error}</span>`
-    : s.model.ready ? `EdgeTAM bereit (${s.model.device})` : `EdgeTAM lädt (${s.model.device}) …`;
-  $("status").innerHTML = `${cam}<br>${model}<br>Phase: ${s.phase}`;
-  if (document.activeElement !== $("source")) $("source").placeholder = s.camera.source;
+  const cam = s.camera.error ? `<span class="bad">${s.camera.error}</span>` : `Kamera ${s.camera.source}`;
+  const tracking = s.tracking.fps ? `Tracking: ${s.tracking.fps} Bilder/s, ${s.tracking.latency_ms} ms Verzögerung` : "Tracking: aus";
+  const trackError = s.tracking.error ? `<br><span class="bad">${s.tracking.error}</span>` : "";
+  const model = !s.model.enabled ? "EdgeTAM: aus"
+    : s.model.error ? `<span class="bad">${s.model.error}</span>`
+    : s.model.ready ? `EdgeTAM (${s.model.device}) prüft nebenher, ${s.model.corrections} Korrekturen`
+    : `EdgeTAM lädt (${s.model.device}) …`;
+  byId("status").innerHTML = `${cam}<br>${tracking}${trackError}<br>${model}<br>Phase: ${s.phase}`;
+  if (document.activeElement !== byId("source")) byId("source").placeholder = s.camera.source;
 
   const p = s.phase;
-  $("scan").disabled = !s.arena.corners.length;
-  $("newBattle").disabled = !s.arena.scanned;
-  $("regBox").hidden = p !== "register";
-  if (s.register) $("regTitle").textContent = `Roboter ${s.register.slot} registrieren`;
-  $("start").hidden = p !== "ready";
-  $("fightBox").hidden = p !== "fight" && p !== "finished";
-  $("abort").hidden = !["register", "ready", "fight", "finished"].includes(p);
-  $("obstacle").disabled = $("powerup").disabled = p !== "fight";
-  $("hp").innerHTML = s.robots.map((r) =>
-    `<div class="hp" style="color:${COLORS[r.id]}"><span>${r.name}${r.outside ? " ⚠ draußen" : ""}${r.present ? "" : " (verloren)"}</span><span>${Math.ceil(r.hp)}</span></div>`).join("");
+  const busy = Boolean(s.busy);
+  const found = s.proposal.filter((r) => r.contour.length).length;
+  const canStart = (p === "register" && !busy && found === 2) || p === "ready";
+  byId("start").disabled = byId("startWide").disabled = !canStart;
+  const startTip = p === "ready" ? "Countdown starten, dann beginnt der Kampf (S)" : "Kampf starten (S)";
+  tip(byId("start"), startTip);
+  tip(byId("startWide"), startTip);
+  byId("startWide").textContent = p === "register" && found < 2 ? `${found} von 2 Robotern erkannt` : "▶";
+  byId("next").disabled = p === "arena";
+  byId("resetArena").hidden = p === "arena" && !corners.length;
+  byId("abort").disabled = !LIVE.includes(p);
+  byId("timer").innerHTML = p === "intro"
+    ? `${Math.ceil(s.intro)}<small>INTRO LÄUFT</small>`
+    : p === "ready" ? `VS<small>START DRÜCKT DEN COUNTDOWN</small>`
+    : p === "countdown" ? `${Math.max(1, Math.ceil(s.countdown))}<small>COUNTDOWN</small>`
+    : `${clock(s.elapsed)}<small>KAMPFZEIT</small>`;
+  const fighting = p === "fight";
+  for (const id of [1, 2]) {
+    byId(`ko${id}`).disabled = !fighting;
+    const robot = s.robots.find((r) => r.id === id);
+    const name = robot?.name || byId(`name${id}`).value || `Roboter ${id}`;
+    tip(byId(`ko${id}`), `K.O. für ${name}: HP auf 0, K.O. in ${id === 1 ? "Blau" : "Rot"}`);
+    const u = robot?.ulti || { charge: 0, ready: false, used: false };
+    const ub = byId(`ulti${id}`);
+    ub.disabled = !fighting || !u.ready;
+    ub.style.setProperty("--charge", `${Math.round(100 * u.charge)}%`);
+    ub.classList.toggle("ready", fighting && u.ready);
+    ub.classList.toggle("used", u.used);
+    tip(ub, u.used ? `Laser-Ulti von ${name} ist verbraucht`
+      : u.ready ? `Laser-Ulti für ${name} abfeuern (${id})`
+      : `Laser-Ulti von ${name} lädt: ${Math.round(100 * u.charge)} %`);
+  }
+  byId("obstacle").disabled = byId("powerup").disabled = !fighting;
+  byId("shrink").disabled = !fighting || Boolean(s.zone);
+  tip(byId("shrink"), s.zone ? "Arena schrumpft gerade" : "Arena schrumpfen: in 30 s auf die halbe Fläche (K)");
+  if (document.activeElement !== byId("hud")) byId("hud").checked = s.hud !== false;
+  byId("hp").replaceChildren(...s.robots.flatMap((r) => {
+    const row = document.createElement("div");
+    row.className = "hp-row";
+    row.style.color = COLORS[r.id];
+    row.innerHTML = "<span></span><span></span>";
+    row.children[0].textContent = `${r.name}${r.outside ? " ⚠ draußen" : ""}${r.present ? "" : " (verloren)"}`;
+    row.children[1].textContent = `${Math.ceil(r.hp)} HP`;
+    const bar = document.createElement("div");
+    bar.className = "hp-bar";
+    const fill = bar.appendChild(document.createElement("div"));
+    fill.style.width = `${(100 * Math.max(0, r.hp)) / r.max_hp}%`;
+    fill.style.background = COLORS[r.id];
+    return [row, bar];
+  }));
 }
 
 function draw() {
@@ -145,43 +660,47 @@ function draw() {
   if (!state?.frame || !frame) return;
   view = fit(canvas, state.frame);
   const v = view;
-  // Das Bild kann verkleinert gesendet sein; Koordinaten beziehen sich immer auf das Original.
-  ctx.drawImage(frame, v.ox, v.oy, state.frame.w * v.s, state.frame.h * v.s);
+  // Das Bild kann verkleinert gesendet sein; Koordinaten beziehen sich immer auf state.frame.
+  drawFrame(ctx, v, state.frame, frame);
 
-  const pts = cornerMode ? corners : state.arena.corners;
-  if (pts.length) {
-    ctx.strokeStyle = "#ffd33d";
+  if (state.phase === "arena" && corners.length) {
+    ctx.strokeStyle = ctx.fillStyle = "#ffcf1b";
     ctx.lineWidth = 2;
-    pathPoly(ctx, v, pts);
-    if (pts.length === 4) ctx.stroke();
-    pts.forEach((p) => {
+    pathPoly(ctx, v, corners);
+    if (corners.length > 1) ctx.stroke();
+    corners.forEach((p) => {
       const [x, y] = toCanvas(v, p);
-      ctx.fillStyle = "#ffd33d";
       ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
     });
   }
+  if (state.frame.kind === "arena") {
+    // Gleiche Grenze wie in der Kampfansicht, damit die Moderation sieht, was das Publikum als Rand sieht.
+    pathPoly(ctx, v, [[0, 0], [state.frame.w, 0], [state.frame.w, state.frame.h], [0, state.frame.h]]);
+    ctx.strokeStyle = "#ffcf1b";
+    ctx.lineWidth = 6;
+    ctx.stroke();
+  }
+  if (state.zone) {
+    pathPoly(ctx, v, state.zone);
+    ctx.strokeStyle = "#ff4d6d";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
 
   const shapes = [];
-  state.confirmed.forEach((c) => shapes.push([c.contour, COLORS[c.slot], c.name]));
-  if (state.register?.contour.length) shapes.push([state.register.contour, "#ffffff", "?"]);
+  state.proposal.forEach((r) => shapes.push([r.contour, COLORS[r.slot], byId(`name${r.slot}`).value || `Roboter ${r.slot}`]));
   state.robots.forEach((r) => shapes.push([r.contour, COLORS[r.id], r.name]));
   for (const [contour, color, label] of shapes) {
     if (!contour.length) continue;
     pathPoly(ctx, v, contour);
-    ctx.fillStyle = color + "55";
-    ctx.fill();
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
     ctx.stroke();
     const [x, y] = toCanvas(v, contour[0]);
     ctx.fillStyle = color;
     ctx.font = "bold 14px system-ui";
     ctx.fillText(label, x, y - 6);
-  }
-  for (const [x0, y0, positive] of state.register?.points || []) {
-    const [x, y] = toCanvas(v, [x0, y0]);
-    ctx.fillStyle = positive ? "#3fb950" : "#f85149";
-    ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
   }
   for (const item of state.items) {
     pathPoly(ctx, v, item.poly);
@@ -191,8 +710,14 @@ function draw() {
   }
 }
 
+setInterval(() => {
+  const online = performance.now() - lastPacket < 2000;
+  byId("conn").textContent = online ? "● App verbunden" : "○ App offline";
+}, 500);
+
 connect((s, bitmap) => {
   state = s;
+  lastPacket = performance.now();
   if (bitmap) { frame?.close?.(); frame = bitmap; }
   ui(s);
   draw();

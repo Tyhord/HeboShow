@@ -2,12 +2,15 @@
 """Lokaler Server: eine WebSocket-Nachricht trägt Bild und Zustand gemeinsam, REST für Bedienaktionen."""
 
 import asyncio
+import json
 import logging
+import uuid
 from pathlib import Path
+from urllib.parse import unquote
 
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse
+from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket, WebSocketDisconnect
@@ -16,9 +19,65 @@ from .app import App, UserError
 
 log = logging.getLogger(__name__)
 WEB = Path(__file__).parent / "web"
+MAX_MEDIA = 100 * 1024 * 1024
+MEDIA_DIR = Path(__file__).resolve().parent.parent / "data" / "media"
 
 
-def create_server(app: App) -> Starlette:
+class MediaStore:
+    """Hochgeladene Dateien auf der Platte; board.json merkt sich die Soundboard-Kacheln."""
+
+    def __init__(self, folder: Path):
+        self.folder = folder
+        self.folder.mkdir(parents=True, exist_ok=True)
+        self.index = folder / "board.json"
+        self.board: list[dict] = json.loads(self.index.read_text("utf-8")) if self.index.exists() else []
+        self.board = [b for b in self.board if (folder / b["key"]).is_file()]
+        self.mimes = {b["key"]: b["mime"] for b in self.board}
+        # Steckbriefe überleben keinen Neustart, ihre Bilder wären sonst ewiger Ballast.
+        for path in folder.iterdir():
+            if path != self.index and path.name not in self.mimes:
+                path.unlink(missing_ok=True)
+
+    def add(self, body: bytes, mime: str, name: str, board: bool) -> dict:
+        key = uuid.uuid4().hex
+        (self.folder / key).write_bytes(body)
+        self.mimes[key] = mime
+        entry = {"key": key, "name": name, "mime": mime}
+        if board:
+            self.board.insert(0, entry)
+            self._save()
+        return entry
+
+    def rename(self, key: str, name: str) -> bool:
+        for entry in self.board:
+            if entry["key"] == key:
+                entry["name"] = name
+                self._save()
+                return True
+        return False
+
+    def remove(self, key: str) -> None:
+        self.board = [b for b in self.board if b["key"] != key]
+        self.mimes.pop(key, None)
+        self._save()
+        try:
+            (self.folder / key).unlink(missing_ok=True)
+        except PermissionError:
+            # Windows sperrt Dateien, die gerade abgespielt werden; der nächste Start räumt sie weg.
+            pass
+
+    def _save(self) -> None:
+        tmp = self.index.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.board, ensure_ascii=False, indent=1), "utf-8")
+        tmp.replace(self.index)
+
+
+def create_server(app: App, media_dir: Path = MEDIA_DIR) -> Starlette:
+    store = MediaStore(media_dir)
+
+    def public(entry: dict) -> dict:
+        return {"url": f"/media/{entry['key']}", "name": entry["name"], "mime": entry["mime"]}
+
     async def operator(_: Request):
         return FileResponse(WEB / "operator.html")
 
@@ -35,6 +94,38 @@ def create_server(app: App) -> Starlette:
             return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
         except TypeError as exc:
             return JSONResponse({"ok": False, "message": f"Ungültige Daten: {exc}"}, status_code=400)
+        return JSONResponse({"ok": True})
+
+    async def upload(request: Request):
+        body = await request.body()
+        if not body or len(body) > MAX_MEDIA:
+            message = "Datei leer oder größer als 100 MB."
+            return JSONResponse({"ok": False, "message": message}, status_code=400)
+        mime = request.headers.get("content-type", "application/octet-stream")
+        name = unquote(request.headers.get("x-name", ""))
+        board = request.headers.get("x-board") == "1"
+        entry = await asyncio.to_thread(store.add, body, mime, name, board)
+        return JSONResponse({"ok": True, **public(entry)})
+
+    async def board(_: Request):
+        return JSONResponse([public(b) for b in store.board])
+
+    async def download(request: Request):
+        key = request.path_params["key"]
+        mime = store.mimes.get(key)
+        if mime is None:
+            return Response(status_code=404)
+        return FileResponse(store.folder / key, media_type=mime)
+
+    async def change(request: Request):
+        key = request.path_params["key"]
+        if request.method == "DELETE":
+            store.remove(key)
+            return JSONResponse({"ok": True})
+        name = str((await request.json()).get("name") or "").strip()
+        if not name or not store.rename(key, name):
+            message = "Kachel nicht gefunden oder Name leer."
+            return JSONResponse({"ok": False, "message": message}, status_code=400)
         return JSONResponse({"ok": True})
 
     async def stream(ws: WebSocket):
@@ -59,6 +150,10 @@ def create_server(app: App) -> Starlette:
         Route("/", operator),
         Route("/stage", stage),
         Route("/api/{name}", action, methods=["POST"]),
+        Route("/media", upload, methods=["POST"]),
+        Route("/media", board, methods=["GET"]),
+        Route("/media/{key}", download, methods=["GET"]),
+        Route("/media/{key}", change, methods=["PATCH", "DELETE"]),
         WebSocketRoute("/ws", stream),
         Mount("/web", StaticFiles(directory=WEB)),
     ])

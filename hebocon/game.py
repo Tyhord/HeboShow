@@ -10,6 +10,10 @@ import numpy as np
 
 from .config import Settings
 
+# Arena schrumpft auf Knopfdruck gleichmäßig auf diesen Flächenanteil; bewusst im Code, nicht in .env.
+SHRINK_MIN_AREA = 0.5
+SHRINK_DURATION_S = 30.0
+
 
 @dataclass
 class RobotInput:
@@ -21,6 +25,8 @@ class RobotInput:
     inside: float
     # Umriss in Arena-Einheiten; nur vorhanden, solange der Roboter gesehen wird.
     outline: np.ndarray | None
+    # Zuletzt an der Arenakante gesehen.
+    edge: bool = False
 
 
 def touches(outline: np.ndarray, point: np.ndarray, radius: float) -> bool:
@@ -51,13 +57,19 @@ class Player:
     outside_since: float | None = None
     last_vel: np.ndarray = field(default_factory=lambda: np.zeros(2, np.float32))
     last_pos: np.ndarray | None = None
+    # Erlittener Schaden lädt die Ulti; Heilen soll die Ladung nicht wieder abbauen.
+    taken: float = 0.0
+    ulti_used: bool = False
 
 
 class Game:
     def __init__(
-        self, cfg: Settings, players: list[tuple[int, str]], t: float, rng: random.Random | None = None
+        self, cfg: Settings, players: list[tuple[int, str]], t: float, rng: random.Random | None = None,
+        size: tuple[float, float] = (1000.0, 1000.0),
     ):
         self.cfg = cfg
+        # Entzerrtes Arena-Rechteck (Breite, Höhe) in Arena-Einheiten.
+        self.size = size
         self.rng = rng or random.Random()
         self.players = [Player(pid, name, cfg.start_hp) for pid, name in players]
         self.items: list[Item] = []
@@ -69,6 +81,9 @@ class Game:
         self._last_t = t
         self._prev_contact = False
         self._last_collision = -1e9
+        self.shrink_t0: float | None = None
+        # Laufender Laser: Linie ist beim Zielen fest, damit der Gegner ausweichen kann.
+        self.shot: dict | None = None
         self._next_spawn = {
             "obstacle": t + self._interval(cfg.obstacle_interval_s),
             "powerup": t + self._interval(cfg.powerup_interval_s),
@@ -76,6 +91,36 @@ class Game:
 
     def player(self, pid: int) -> Player:
         return next(p for p in self.players if p.id == pid)
+
+    def start_shrink(self, t: float) -> bool:
+        if self.finished or self.shrink_t0 is not None:
+            return False
+        self.shrink_t0 = t
+        self._event(t, "shrink")
+        return True
+
+    def zone(self, t: float) -> tuple[float, float, float, float] | None:
+        """Erlaubtes Rechteck (x0, y0, x1, y1) in Arena-Einheiten, None solange nicht geschrumpft wird."""
+        if self.shrink_t0 is None:
+            return None
+        progress = min(1.0, max(0.0, (t - self.shrink_t0) / SHRINK_DURATION_S))
+        area = 1.0 - (1.0 - SHRINK_MIN_AREA) * progress
+        w, h = self.size
+        hw, hh = w / 2 * np.sqrt(area), h / 2 * np.sqrt(area)
+        return w / 2 - hw, h / 2 - hh, w / 2 + hw, h / 2 + hh
+
+    def _zone_fraction(self, t: float, outline: np.ndarray | None) -> float:
+        zone = self.zone(t)
+        if zone is None or outline is None:
+            return 1.0
+        x0, y0, x1, y1 = zone
+        hull = cv2.convexHull(outline.reshape(-1, 1, 2).astype(np.float32))
+        total = cv2.contourArea(hull)
+        if total <= 0:
+            return 1.0
+        rect = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], np.float32).reshape(-1, 1, 2)
+        common, _ = cv2.intersectConvexConvex(hull, rect)
+        return float(common) / total
 
     def _interval(self, base: float) -> float:
         return base * self.rng.uniform(0.7, 1.3)
@@ -87,7 +132,9 @@ class Game:
     def _damage(self, t: float, p: Player, amount: float, kind: str, pos: np.ndarray | None) -> None:
         if amount <= 0:
             return
+        before = p.hp
         p.hp = max(0.0, p.hp - amount)
+        p.taken += before - p.hp
         if kind != "ringout":
             where = None if pos is None else pos.tolist()
             self._event(t, kind, player=p.id, amount=round(amount, 1), pos=where)
@@ -102,6 +149,7 @@ class Game:
         self._collision(t, by_id, contact)
         self._items(t, by_id)
         self._spawner(t, robots)
+        self._ulti(t, by_id)
         for p in self.players:
             r = by_id.get(p.id)
             if r is not None and r.present:
@@ -115,11 +163,16 @@ class Game:
         cfg = self.cfg
         for p in self.players:
             r = robots.get(p.id)
+            if r is not None and not r.present and r.edge:
+                # Über die Kante verschwunden: ganz hinausgefahren, das ist K.o.
+                p.hp = 0.0
+                self._event(t, "ringout_ko", player=p.id)
+                continue
             if r is None or not r.present:
-                # Unsichtbar heißt meist: weit draußen. Der letzte Zustand gilt weiter.
-                outside = p.outside_since is not None
+                # Nicht zu sehen und nicht an der Kante verloren: zählt trotzdem als draußen.
+                outside = True
             else:
-                outside = r.inside < 0.5
+                outside = min(r.inside, self._zone_fraction(t, r.outline)) < 0.5
             if not outside:
                 if p.outside_since is not None:
                     self._event(t, "ringout_end", player=p.id)
@@ -198,10 +251,13 @@ class Game:
         cfg = self.cfg
         obstacle = kind == "obstacle"
         radius = cfg.obstacle_radius if obstacle else cfg.powerup_radius
+        x0, y0, x1, y1 = self.zone(t) or (0.0, 0.0, *self.size)
         margin = radius + 30
+        if x1 - x0 <= 2 * margin or y1 - y0 <= 2 * margin:
+            return False
         for _ in range(80):
-            pos = np.array([self.rng.uniform(margin, cfg.arena_units - margin),
-                            self.rng.uniform(margin, cfg.arena_units - margin)], np.float32)
+            pos = np.array([self.rng.uniform(x0 + margin, x1 - margin),
+                            self.rng.uniform(y0 + margin, y1 - margin)], np.float32)
             if any(np.linalg.norm(r.pos - pos) < r.radius + radius + 120 for r in robots if r.present):
                 continue
             if any(np.linalg.norm(i.pos - pos) < i.radius + radius + 60 for i in self.items):
@@ -213,11 +269,66 @@ class Game:
             return True
         return False
 
+    def ulti_charge(self, p: Player) -> float:
+        if self.cfg.ulti_charge_hp <= 0:
+            return 1.0
+        return min(1.0, p.taken / self.cfg.ulti_charge_hp)
+
+    def ulti_ready(self, p: Player) -> bool:
+        return not self.finished and not p.ulti_used and self.shot is None and self.ulti_charge(p) >= 1.0
+
+    def fire_ulti(self, pid: int, t: float) -> bool:
+        p = self.player(pid)
+        foe = next((o for o in self.players if o.id != pid), None)
+        if not self.ulti_ready(p) or foe is None or p.last_pos is None or foe.last_pos is None:
+            return False
+        w, h = self.size
+        start = np.clip(p.last_pos.astype(np.float32), 0, [w, h])
+        d = foe.last_pos - start
+        norm = float(np.linalg.norm(d))
+        if norm < 1e-6:
+            return False
+        d = d / norm
+        # Bis zur Arenawand verlängern: wer nicht ausweicht, steht irgendwo auf dieser Linie.
+        reach = min((w - start[0]) / d[0] if d[0] > 0 else -start[0] / d[0] if d[0] < 0 else np.inf,
+                    (h - start[1]) / d[1] if d[1] > 0 else -start[1] / d[1] if d[1] < 0 else np.inf)
+        end = start + d * float(reach)
+        p.ulti_used = True
+        line = {"from": start.tolist(), "to": end.tolist()}
+        self.shot = {"player": pid, **line, "fire_at": t + self.cfg.ulti_aim_s}
+        self._event(t, "ulti_aim", player=pid, **line)
+        return True
+
+    def _ulti(self, t: float, robots: dict[int, RobotInput]) -> None:
+        shot = self.shot
+        if shot is None or t < shot["fire_at"]:
+            return
+        self.shot = None
+        foe = next(o for o in self.players if o.id != shot["player"])
+        r = robots.get(foe.id)
+        start, end = np.array(shot["from"], np.float32), np.array(shot["to"], np.float32)
+        hit = None
+        if r is not None and r.present and r.outline is not None:
+            steps = max(2, int(np.linalg.norm(end - start) / 10))
+            hit = next((pt for pt in np.linspace(start, end, steps)
+                        if touches(r.outline, pt, self.cfg.ulti_width / 2)), None)
+        self._event(t, "ulti_fire", player=shot["player"], hit=hit is not None,
+                    at=None if hit is None else hit.tolist(), **{"from": shot["from"], "to": shot["to"]})
+        if hit is not None:
+            self._damage(t, foe, self.cfg.ulti_damage, "ulti", hit)
+
+    def knockout(self, pid: int, t: float) -> None:
+        if self.finished:
+            return
+        self.player(pid).hp = 0.0
+        self._check_end(t)
+
     def _check_end(self, t: float) -> None:
         dead = [p for p in self.players if p.hp <= 0]
         if not dead:
             return
         self.finished = True
+        self.shot = None
         alive = [p for p in self.players if p.hp > 0]
         self.winner = alive[0].id if alive else None
         self._event(t, "ko", players=[p.id for p in dead], winner=self.winner)
