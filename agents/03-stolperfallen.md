@@ -57,3 +57,12 @@
   geklappt hat.
 * Ohne `websockets` hat uvicorn kein WebSocket. Das Paket steht deshalb in den
   Abhängigkeiten.
+
+## LAN
+
+* Erster Serverstart: Windows-Firewall fragt nach `python.exe`. Ohne Freigabe für private
+  Netze finden Clients auf anderen Geräten den Server nicht (TCP 8765, UDP 8766).
+* Das Server-Banner listet auch virtuelle Adapter (WSL, Hyper-V, z.B. `172.x`). Die echte
+  LAN-Adresse ist meist `192.168.x.x`.
+* Die Seiten kommen vom Client, nicht vom Server. Pfade in `web/` daher relativ halten und
+  Server-Adressen nur über `api()`/`mediaUrl()` aus `common.js` bilden.

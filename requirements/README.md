@@ -12,12 +12,12 @@ Wer neu dazukommt, liest von oben nach unten.
 | [01-ueberblick.md](01-ueberblick.md) | Was ist Hebocon, wer benutzt die App, was sie nicht tut |
 | [02-spielregeln.md](02-spielregeln.md) | HP, Ringout, Kollision, Hindernisse, Power-ups, Sieg |
 | [03-match-ablauf.md](03-match-ablauf.md) | Vom Arena-Scan bis zum Sieger, Schritt für Schritt |
-| [04-bedienung.md](04-bedienung.md) | Die zwei Fenster, Knöpfe, Klicks, Tasten |
+| [04-bedienung.md](04-bedienung.md) | Anmeldung im Client, Bühne, Bedienung, Spieleransicht, Knöpfe, Tasten |
 | [05-kamera-quellen.md](05-kamera-quellen.md) | USB-Kamera, Stream, Videodatei |
 | [06-spielfeld-erkennung.md](06-spielfeld-erkennung.md) | Vier Ecken, Leerbild, Vordergrund |
 | [07-fahrzeug-erkennung.md](07-fahrzeug-erkennung.md) | Registrierung, Tracking über das Leerbild, EdgeTAM optional |
-| [09-architektur.md](09-architektur.md) | Bausteine, Threads, Datenfluss |
-| [10-schnittstellen.md](10-schnittstellen.md) | REST-Aktionen, WebSocket-Paket, Zustand |
+| [09-architektur.md](09-architektur.md) | Server und Client, Bausteine, Threads, Datenfluss |
+| [10-schnittstellen.md](10-schnittstellen.md) | Suche, Anmeldung, Rechte, REST-Aktionen, WebSocket-Paket, Zustand |
 | [11-konfiguration.md](11-konfiguration.md) | Alle Einstellwerte |
 | [12-entscheidungen-und-grenzen.md](12-entscheidungen-und-grenzen.md) | Bewusste Entscheidungen, bekannte Grenzen |
 

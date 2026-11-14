@@ -8,8 +8,9 @@ Die wichtigsten drei:
 1. **Fachlichkeit gehört nach `requirements/`.** Ändert sich Verhalten, wird die
    passende Datei dort im selben Schritt angepasst. Die Zuordnungstabelle steht in
    `AGENTS.md`.
-2. **Immer das Projekt-`.venv` über `uv`.** `python -m uv add <paket>`,
-   `.venv\Scripts\python -m …`. Kein Docker.
+2. **Immer das Projekt-`.venv` über `uv`.** Server und Client haben je eines
+   (`hebo-server\.venv`, `hebo-client\.venv`): `python -m uv add <paket>` im jeweiligen
+   Ordner, `.venv\Scripts\python -m …`. Kein Docker.
 3. **Kein Overengineering.** Passt etwas so wie es ist, bleibt es so.
 
 Code-Kommentare immer auf Deutsch und nur zum **Warum**.

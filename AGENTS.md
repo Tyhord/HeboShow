@@ -85,23 +85,27 @@ es vorher und schreibt es in `requirements/`.
 * Python 3.12: Ruff, Zeilenlänge 110, Regeln `E, F, I, UP, B`
 * Web: reines HTML/JS-Modul mit Canvas, kein Build-Schritt, kein Framework
 * Meldungen an den Nutzer sind deutscher Klartext und sagen, was zu tun ist
-* `App.state()` in `hebocon/app.py` und die Seiten in `hebocon/web/` müssen zusammenpassen
+* `App.state()` in `hebo-server/hebocon/app.py` und die Seiten in `hebo-client/web/` müssen zusammenpassen
+* Spiellogik nur im Server. Der Client zeigt an und schickt Aktionen, er rechnet nichts nach.
 
 ## Starten und prüfen
+
+Server und Client haben je ein eigenes `.venv`; Befehle im jeweiligen Ordner ausführen.
 
 ```powershell
 # Einmalig
 python -m pip install --user uv
-python -m uv sync
+cd hebo-server; python -m uv sync
+cd ..\hebo-client; python -m uv sync
 
-# Starten: öffnet Bühne und Bedienung
-.venv\Scripts\python -m hebocon
-# Nur Server, Seiten im Browser: http://127.0.0.1:8765/ und /stage
-.venv\Scripts\python -m hebocon --no-window --camera 0
+# Server: nur Konsole, kein Fenster
+cd hebo-server; .venv\Scripts\python -m hebocon --camera 0
+# Client: fragt nach name: (stage, mod oder Spielername)
+cd hebo-client; .venv\Scripts\python client.py --server 127.0.0.1
 
-# Prüfen
+# Prüfen (im Ordner hebo-server)
 .venv\Scripts\python -m pytest -q
-.venv\Scripts\python -m ruff check hebocon tests
+.venv\Scripts\python -m ruff check hebocon tests ..\hebo-client\client.py
 ```
 
 Details in [`agents/02-pruefen.md`](agents/02-pruefen.md).

@@ -18,3 +18,10 @@ def test_board_survives_restart(tmp_path):
     again.remove(meme["key"])
     assert MediaStore(tmp_path).board == []
     assert not (tmp_path / meme["key"]).exists()
+
+
+def test_cutout_flag_survives_restart(tmp_path):
+    store = MediaStore(tmp_path)
+    meme = store.add(b"webm", "video/webm", "Meme 001", board=True, cutout=True, source="Meme_001.mp4")
+    assert MediaStore(tmp_path).board == [{"key": meme["key"], "name": "Meme 001", "mime": "video/webm",
+                                           "cutout": True, "source": "Meme_001.mp4"}]

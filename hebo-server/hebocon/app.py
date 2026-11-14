@@ -7,16 +7,20 @@ Arena-Einheiten.
 
 import json
 import logging
+import math
+import random
 import threading
 import time
+from pathlib import Path
 
 import cv2
 import numpy as np
 
 from .arena import UNITS, Arena, foreground, whiten
 from .camera import Camera
-from .config import Settings
+from .config import BALANCING, Settings
 from .game import Game, RobotInput
+from .lobby import Lobby
 from .tracking import Arbiter, Tracker
 
 log = logging.getLogger(__name__)
@@ -28,6 +32,9 @@ LIVE_PHASES = ("intro", "ready", "countdown", "fight", "finished")
 PROFILE_EMPTY = {"image": "", "team": "", "weight": "", "height": "", "slogan": ""}
 # Rand ums Spielfeld im Bühnenbild (Arena-Einheiten); nur Optik, Erkennung und Ringout bleiben beim Feld.
 VIEW_PAD = 80.0
+# Spielzeit, nach der ein Medium spätestens endet, falls keine Bühne „ended“ meldet.
+MEME_LIMIT_S = {"image": 6.5, "video": 30.0, "audio": 90.0}
+CUTOUT_LIMIT_S = 120.0
 
 
 class UserError(Exception):
@@ -39,8 +46,14 @@ def _points(pts: np.ndarray | None) -> list[list[float]]:
 
 
 class App:
-    def __init__(self, cfg: Settings):
+    def __init__(self, cfg: Settings, balancing_file: Path | None = None, lobby: Lobby | None = None):
         self.cfg = cfg
+        self.lobby = lobby
+        self._message = ""
+        # Werte aus .env/Code merken, damit „Standardwerte“ dorthin zurückführt.
+        self.balancing_defaults = {k: getattr(cfg, k) for k in BALANCING}
+        self.balancing_file = balancing_file
+        self._load_balancing()
         self.camera = Camera(cfg.camera, cfg.camera_width, cfg.camera_height)
         self.segmenter = None
         if cfg.segment_enabled:
@@ -57,6 +70,11 @@ class App:
         self.seeds: dict[int, tuple[float, float]] = {}
         self.proposal: list[np.ndarray | None] = [None, None]
         self.names = ["", ""]
+        # Spieler, die sich mitten im Kampf anmelden, bekommen ihren Namen erst beim nächsten Kampf.
+        self._pending_names: dict[int, str] = {}
+        if lobby is not None:
+            for p in lobby.public()["players"]:
+                self.names[p["slot"] - 1] = p["name"]
         self.game: Game | None = None
         self.robots: list = []
         self.contact = False
@@ -64,8 +82,10 @@ class App:
         self.hud = True
         # Steckbriefe für den VS-Bildschirm; überdauern Kämpfe, bis die Moderation sie ändert.
         self.profiles = [dict(PROFILE_EMPTY), dict(PROFILE_EMPTY)]
-        # Einmalige Bühneneinblendung; die Bühne erkennt eine neue an der laufenden Nummer.
-        self.cue: dict | None = None
+        # Laufende und pausierte Medien; der Server führt sie, damit alle Bühnen dasselbe zeigen.
+        self.memes: list[dict] = []
+        self._meme_ids = 0
+        self._meme_rng = random.Random()
         # Kampfzeit in Kamerazeit: Beginn nach dem Intro, Ende beim K.o.
         self.phase_until = 0.0
         self.fight_start: float | None = None
@@ -76,6 +96,17 @@ class App:
         self.packet: tuple[int, bytes] = (0, b"")
         self._lock = threading.RLock()
         self._stop = threading.Event()
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @message.setter
+    def message(self, text: str) -> None:
+        # Die Serverkonsole ist das Protokoll des Abends; jede neue Meldung gehört hinein.
+        if text != self._message:
+            log.info("%s", text)
+        self._message = text
 
     # ---------- Lebenszyklus ----------
 
@@ -116,7 +147,7 @@ class App:
         if handler is None:
             raise UserError(f"Unbekannte Aktion '{action}'.")
         if self.busy and action not in ("camera", "abort", "spawn", "shrink", "hud", "profile", "cue", "ko",
-                                        "ulti"):
+                                        "ulti", "balancing", "balancing_reset", "name", "kick"):
             raise UserError(f"Bitte warten: {self.busy}")
         with self._lock:
             handler(**data)
@@ -212,8 +243,13 @@ class App:
             raise UserError("Spawnen geht nur im laufenden Kampf.")
         if kind not in ("obstacle", "powerup"):
             raise UserError("Unbekanntes Objekt.")
+        name = "Hindernis" if kind == "obstacle" else "Power-up"
         if not self.game.spawn(kind, time.monotonic(), self._robot_inputs()):
-            raise UserError("Kein freier Platz zum Spawnen.")
+            # Auch im Zustand: Sonst überschreibt das nächste Bild die Meldung, Tastenkürzel sähen sie nie.
+            self.message = (f"Kein freier Platz für {name}: Die Arena ist zu klein oder von Robotern und "
+                            "Objekten belegt. Warte, bis Objekte verschwinden oder die Roboter Platz machen.")
+            raise UserError(self.message)
+        self.message = f"{name} gespawnt."
 
     def do_shrink(self) -> None:
         if self.phase != "fight" or self.game is None:
@@ -234,6 +270,28 @@ class App:
         # Ab dem Start hängt der Name am laufenden Kampf; davor braucht ihn schon die VS-Vorschau.
         if self.phase not in LIVE_PHASES:
             self.names[player - 1] = str(name).strip() or f"Roboter {player}"
+
+    def do_name(self, player: int, name: str) -> None:
+        if player not in (1, 2):
+            raise UserError("Unbekannter Roboter.")
+        self.player_joined(player, str(name).strip() or f"Roboter {player}")
+
+    def do_kick(self, slot: int) -> None:
+        if self.lobby is None or slot not in (1, 2):
+            raise UserError("Unbekannter Spielerplatz.")
+        name = self.lobby.kick(slot)
+        if name is None:
+            raise UserError(f"Platz {slot} ist schon frei.")
+        self.message = f"{name} von Platz {slot} entfernt."
+
+    def player_joined(self, slot: int, name: str) -> None:
+        """Neuer Name für einen Platz; im laufenden Kampf gilt er erst ab dem nächsten."""
+        with self._lock:
+            if self.phase in LIVE_PHASES:
+                self._pending_names[slot] = name
+            else:
+                self._pending_names.pop(slot, None)
+                self.names[slot - 1] = name
 
     def do_ko(self, player: int) -> None:
         if self.phase != "fight" or self.game is None:
@@ -259,13 +317,95 @@ class App:
         if not self.game.fire_ulti(player, time.monotonic()):
             raise UserError("Kein Ziel: beide Roboter müssen schon gesehen worden sein.")
 
-    def do_cue(self, kind: str, media: dict | None = None) -> None:
-        if kind not in ("media", "stop"):
+    def do_cue(self, kind: str, media: dict | None = None, id: int | None = None) -> None:  # noqa: A002
+        t = time.monotonic()
+        if kind == "stop":
+            self.memes = []
+        elif kind == "ended":
+            self.memes = [m for m in self.memes if m["id"] != id]
+        elif kind == "media":
+            if not (media and media.get("url")):
+                raise UserError("Medium fehlt.")
+            running = next((m for m in self.memes if m["media"]["url"] == media["url"]), None)
+            if running is None:
+                self._meme_ids += 1
+                rng = self._meme_rng
+                # Position als Anteil des freien Platzes; jede Bühne rechnet sie mit der echten Größe um.
+                self.memes.append({"id": self._meme_ids, "media": media, "paused": False, "played": 0.0,
+                                   "since": t, "x": rng.random(), "y": rng.random(),
+                                   "tilt": round(rng.uniform(-4, 4), 1)})
+            elif running["paused"]:
+                running["paused"], running["since"] = False, t
+            else:
+                running["played"] += t - running["since"]
+                running["paused"] = True
+        else:
             raise UserError("Unbekannte Einblendung.")
-        if kind == "media" and not (media and media.get("url")):
-            raise UserError("Medium fehlt.")
-        seq = self.cue["seq"] + 1 if self.cue else 1
-        self.cue = {"seq": seq, "kind": kind, "media": media if kind == "media" else None}
+
+    @staticmethod
+    def _meme_played(m: dict, t: float) -> float:
+        return m["played"] + (0.0 if m["paused"] else t - m["since"])
+
+    def _meme_state(self, t: float) -> list[dict]:
+        def limit(m: dict) -> float:
+            if m["media"].get("cutout"):
+                return CUTOUT_LIMIT_S
+            return MEME_LIMIT_S.get(m["media"].get("mime", "").split("/")[0], CUTOUT_LIMIT_S)
+
+        self.memes = [m for m in self.memes if self._meme_played(m, t) < limit(m)]
+        return [{"id": m["id"], "media": m["media"], "paused": m["paused"],
+                 "played": round(self._meme_played(m, t), 2), "x": m["x"], "y": m["y"], "tilt": m["tilt"]}
+                for m in self.memes]
+
+    def do_balancing(self, key: str, value: float) -> None:
+        # Spiel und Oberfläche lesen dasselbe cfg-Objekt, daher greift die Änderung sofort, auch im Kampf.
+        self._set_balancing(key, value)
+        self._save_balancing()
+
+    def do_balancing_reset(self) -> None:
+        for key, value in self.balancing_defaults.items():
+            setattr(self.cfg, key, value)
+        if self.balancing_file is not None:
+            self.balancing_file.unlink(missing_ok=True)
+        self.message = "Balancing auf Standardwerte zurückgesetzt."
+
+    def _set_balancing(self, key: str, value) -> None:
+        if key not in BALANCING:
+            raise UserError("Unbekannter Balancing-Wert.")
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            number = math.nan
+        low, high = BALANCING[key]
+        if not math.isfinite(number) or number < low or (high is not None and number > high):
+            limit = f"von {low:g} bis {high:g}" if high is not None else f"ab {low:g}"
+            raise UserError(f"Balancing: bitte eine Zahl {limit} eingeben (rot markiertes Feld).")
+        setattr(self.cfg, key, number)
+
+    def _load_balancing(self) -> None:
+        path = self.balancing_file
+        if path is None or not path.is_file():
+            return
+        try:
+            saved = json.loads(path.read_text("utf-8"))
+        except (OSError, ValueError):
+            log.warning("%s ist unlesbar, Balancing bleibt bei den Standardwerten.", path)
+            return
+        for key, value in saved.items():
+            try:
+                self._set_balancing(key, value)
+            except UserError:
+                # Von Hand verbogene oder veraltete Einträge sollen den Start nicht verhindern.
+                log.warning("Balancing-Wert %s=%r ignoriert.", key, value)
+
+    def _save_balancing(self) -> None:
+        path = self.balancing_file
+        if path is None:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({k: getattr(self.cfg, k) for k in BALANCING}, indent=1), "utf-8")
+        tmp.replace(path)
 
     def _set_names(self, names: list[str] | None) -> None:
         given = list(names or [])[:2] + ["", ""]
@@ -287,6 +427,9 @@ class App:
         self.fight_start = self.fight_end = None
         self.phase = "register"
         self.message = message
+        for slot, name in self._pending_names.items():
+            self.names[slot - 1] = name
+        self._pending_names.clear()
 
     def _drop_tracker(self) -> None:
         if self.tracker is not None:
@@ -460,8 +603,10 @@ class App:
             "finished": bool(self.game and self.game.finished),
             "intro": left if self.phase == "intro" else None,
             "countdown": left if self.phase == "countdown" else None,
-            "cue": self.cue, "elapsed": elapsed, "hud": self.hud, "vs": vs, "names": self.names,
+            "memes": self._meme_state(t), "elapsed": elapsed, "hud": self.hud, "vs": vs, "names": self.names,
             "profiles": self.profiles, "shot": shot,
+            "balancing": {k: getattr(self.cfg, k) for k in BALANCING},
+            "lobby": self.lobby.public() if self.lobby else {"players": [], "online": {}},
         }
 
     def _publish(self, image: np.ndarray, seq: int) -> None:

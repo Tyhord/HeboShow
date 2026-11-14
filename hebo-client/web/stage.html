@@ -3,8 +3,8 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<!-- Seiten kommen über / und /stage, Module liegen unter /web. -->
-<base href="/web/">
+<!-- Der Client liefert die Seiten selbst aus; Spiel und Medien kommen vom Server aus der URL. -->
+<base href="./">
 <title>Hebocon Kampfansicht</title>
 <style>
   :root { font-family: Inter, Arial, sans-serif; color: #fff; background: #080b13; }
@@ -92,8 +92,12 @@
   .media-overlay { position: fixed; z-index: 16; inset: 0; pointer-events: none; }
   .media-overlay img, .media-overlay video { --tilt: 0deg; position: absolute; width: auto; height: auto; max-width: 28vw; max-height: 32vh;
     border: 3px solid #fff; border-radius: 10px; background: #000; box-shadow: 0 10px 28px #000b;
-    transform: rotate(var(--tilt)); animation: meme-in .35s cubic-bezier(.2, 1.6, .4, 1) both; }
+    transform: rotate(var(--tilt)); visibility: hidden; }
+  /* Erst sichtbar, wenn die echte Größe bekannt und der Platz berechnet ist. */
+  .media-overlay .shown { visibility: visible; animation: meme-in .35s cubic-bezier(.2, 1.6, .4, 1) both; }
   @keyframes meme-in { from { opacity: 0; transform: scale(.4) rotate(var(--tilt)); } }
+  /* Freigestellte Memes schweben frei über der Arena, ohne sichtbaren Videokasten. */
+  .media-overlay .cutout { border: 0; border-radius: 0; background: none; box-shadow: none; }
 
   .intro-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; z-index: 15; }
 
@@ -228,7 +232,7 @@
 <div class="media-overlay" id="media" aria-live="polite"></div>
 <div class="ko-overlay" id="ko" aria-live="assertive"><span class="ko-text" aria-label="Knockout">K.O.!</span></div>
 <script type="module">
-import { COLORS, connect, drawFrame, fit, hotkeys, pathPoly, resizeCanvas, toCanvas } from "./common.js";
+import { act, COLORS, connect, drawFrame, fit, hotkeys, mediaUrl, pathPoly, resizeCanvas, ROLE, toCanvas } from "./common.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("c");
@@ -244,12 +248,14 @@ let shake = 0;
 let lastPacket = 0;
 let calloutTimer = 0;
 let koTimers = [];
-let cueSeq = null;
 let introBattle = -1;
-const playing = new Set();
+// Laufende Medien je Server-ID; beendete IDs merken, damit ein verspätetes Paket sie nicht wiederbelebt.
+const playing = new Map();
+const finished = new Set();
 // Vorschau der Moderation im iframe: keine Tastenkürzel, keine Medien, kein Spielablauf.
 const PREVIEW = new URLSearchParams(location.search).has("preview");
-if (!PREVIEW) hotkeys();
+// Nur die Moderation darf steuern; auf anderen Geräten liefen die Kürzel ins Leere.
+if (!PREVIEW && ROLE === "moderator") hotkeys();
 
 // Giftrauch außerhalb des Felds: Wolken einmal vorrendern und pro Bild nur verschieben, damit die Bühne flüssig bleibt.
 function cloudSprite(rgb) {
@@ -399,62 +405,86 @@ function knockout(color) {
   ];
 }
 
-function stopMedia() {
-  [...playing].forEach((stop) => stop());
+// Zufälliger Platz im ganzen Bild: x/y vom Server sind Anteile des freien Raums, damit alle Bühnen
+// dieselbe Stelle zeigen und das Meme samt Neigung bei jeder Fenstergröße komplett sichtbar bleibt.
+function place(el, m) {
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+  const a = Math.abs(m.tilt) * Math.PI / 180;
+  const dx = (w * Math.cos(a) + h * Math.sin(a) - w) / 2;
+  const dy = (w * Math.sin(a) + h * Math.cos(a) - h) / 2;
+  const box = $("media");
+  el.style.left = `${dx + m.x * Math.max(0, box.clientWidth - w - 2 * dx)}px`;
+  el.style.top = `${dy + m.y * Math.max(0, box.clientHeight - h - 2 * dy)}px`;
+  el.classList.add("shown");
+}
+addEventListener("resize", () => playing.forEach((p) => p.el.isConnected && place(p.el, p.m)));
+
+function seek(el, seconds) {
+  if (Math.abs(el.currentTime - seconds) > 0.5) el.currentTime = seconds;
 }
 
-// Ecken unterhalb des HUD; ein Meme deckt so nie Lebensleisten oder die Arena-Mitte zu.
-const SPOTS = [
-  { left: 2, top: 18 }, { right: 2, top: 18 }, { left: 2, bottom: 6 }, { right: 2, bottom: 6 },
-];
-
-function freeSpot() {
-  const used = [...$("media").children].map((el) => Number(el.dataset.spot));
-  const free = SPOTS.map((_, i) => i).filter((i) => !used.includes(i));
-  const pool = free.length ? free : SPOTS.map((_, i) => i);
-  return pool[Math.floor(Math.random() * pool.length)];
+function play(el) {
+  // Browser blockieren Ton ohne vorherigen Klick auf der Seite; dann bleibt es eben still.
+  el.play().catch(() => { el.muted = true; el.play().catch(() => {}); });
 }
 
-function showMedia(m) {
-  const kind = m.mime.split("/")[0];
+function startMedia(m) {
+  const kind = m.media.mime.split("/")[0];
   let el;
-  let timer = 0;
-  const stop = () => {
-    clearTimeout(timer);
-    el.pause?.();
-    el.remove?.();
-    playing.delete(stop);
+  const end = () => {
+    if (!playing.has(m.id)) return;
+    finished.add(m.id);
+    removeMedia(m.id);
+    act("cue", { kind: "ended", id: m.id });
   };
   if (kind === "audio") {
-    el = new Audio(m.url);
+    el = new Audio(mediaUrl(m.media.url));
     el.volume = 0.9;
-    el.play().catch(() => {});
   } else {
     el = document.createElement(kind === "video" ? "video" : "img");
-    el.src = m.url;
-    const spot = freeSpot();
-    el.dataset.spot = spot;
-    Object.entries(SPOTS[spot]).forEach(([k, v]) => { el.style[k] = `${v + Math.random() * 3}%`; });
-    el.style.setProperty("--tilt", `${(Math.random() * 8 - 4).toFixed(1)}deg`);
-    if (kind === "video") {
-      el.playsInline = true;
-      // Browser blockieren Ton ohne vorherigen Klick auf der Seite; dann bleibt es eben still.
-      el.play().catch(() => { el.muted = true; el.play().catch(() => {}); });
-    }
+    el.style.setProperty("--tilt", `${m.tilt}deg`);
+    if (m.media.cutout) el.classList.add("cutout");
+    if (kind === "video") el.playsInline = true;
+    // Erst mit bekannter Größe platzieren, sonst rechnet place() mit 300×150 Platzhaltermaßen.
+    const ready = () => place(el, playing.get(m.id)?.m || m);
+    if (kind === "video") el.onloadedmetadata = ready;
+    else el.onload = ready;
+    el.src = mediaUrl(m.media.url);
     $("media").append(el);
   }
-  el.onended = stop;
-  timer = setTimeout(stop, kind === "image" ? 6500 : kind === "video" ? 30000 : 90000);
-  playing.add(stop);
+  if (kind !== "image") {
+    // Später geöffnete Bühne steigt an der laufenden Stelle ein.
+    if (m.played > 0.5) el.addEventListener("loadedmetadata", () => seek(el, m.played), { once: true });
+    if (!m.paused) play(el);
+  }
+  el.onended = end;
+  el.onerror = end;
+  playing.set(m.id, { el, m, kind });
 }
 
-function handleCue(cue) {
-  const seq = cue?.seq ?? 0;
-  // Beim Öffnen der Bühne nichts nachholen, was vorher schon gezeigt wurde.
-  if (cueSeq === null || seq === cueSeq) { cueSeq = seq; return; }
-  cueSeq = seq;
-  if (cue.kind === "media") showMedia(cue.media);
-  else stopMedia();
+function removeMedia(id) {
+  const p = playing.get(id);
+  if (!p) return;
+  p.el.pause?.();
+  p.el.remove();
+  playing.delete(id);
+}
+
+function syncMedia(list = []) {
+  const ids = new Set(list.map((m) => m.id));
+  [...playing.keys()].filter((id) => !ids.has(id)).forEach(removeMedia);
+  for (const m of list) {
+    if (finished.has(m.id)) continue;
+    const p = playing.get(m.id);
+    if (!p) { startMedia(m); continue; }
+    if (p.m.paused !== m.paused && p.kind !== "image") {
+      // Beim Umschalten auf die Serverzeit gehen, damit mehrere Bühnen nicht auseinanderlaufen.
+      seek(p.el, m.played);
+      if (m.paused) p.el.pause(); else play(p.el);
+    }
+    p.m = m;
+  }
 }
 
 // Mitte zwischen den nächstgelegenen Umrisspunkten: dort berühren sich die Roboter wirklich, nicht zwischen den Schwerpunkten.
@@ -926,9 +956,9 @@ function updateHud(s) {
   [1, 2].forEach((id) => {
     const r = s.robots.find((o) => o.id === id);
     const el = $(`f${id}`);
-    const hp = r ? Math.max(0, r.hp) : 100;
-    const max = r ? r.max_hp : 100;
-    const pct = `calc(${(100 * hp) / max}% - 6px)`;
+    const max = r ? r.max_hp : s.balancing.start_hp;
+    const hp = r ? Math.max(0, r.hp) : max;
+    const pct = `calc(${Math.min(100, (100 * hp) / max)}% - 6px)`;
     el.querySelector(".name").textContent = r?.name || s.names?.[id - 1] || `Roboter ${id}`;
     el.querySelector(".fill").style.width = pct;
     el.querySelector(".trail").style.width = pct;
@@ -957,8 +987,9 @@ function updateVs(s) {
     const p = s.profiles?.[id - 1] || {};
     const photo = card.querySelector(".photo");
     // Ohne hochgeladenes Bild bleibt der Live-Ausschnitt aus dem Kamerabild.
-    if (photo.getAttribute("src") !== (p.image || null)) {
-      if (p.image) photo.src = p.image; else photo.removeAttribute("src");
+    const image = mediaUrl(p.image) || null;
+    if (photo.getAttribute("src") !== image) {
+      if (image) photo.src = image; else photo.removeAttribute("src");
     }
     photo.hidden = !p.image;
     $(`portrait${id}`).hidden = Boolean(p.image);
@@ -1094,7 +1125,7 @@ if (PREVIEW) {
 } else {
   connect((s, bitmap) => {
     ingest(s);
-    handleCue(s.cue);
+    syncMedia(s.memes);
     state = s;
     lastPacket = performance.now();
     if (bitmap) { frame?.close?.(); frame = bitmap; }

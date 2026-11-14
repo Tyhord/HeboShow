@@ -8,32 +8,43 @@
 * Torch nur CPU (eigener Index in `pyproject.toml`).
 * Modell `yonigozlan/EdgeTAM-hf` über `transformers`, braucht `timm`. Wird beim ersten
   Start in den Hugging-Face-Cache geladen.
-* Ein Prozess, Port **8765** auf `127.0.0.1`.
+* Server: ein Prozess, Port **8765** (HTTP/WebSocket) auf `0.0.0.0`, UDP **8766** für die
+  Suche im LAN. Keine Fenster, nur Konsole.
+* Client: eigenes `.venv` mit nur `pywebview`. Liefert die Seiten über einen lokalen
+  Mini-Server auf `127.0.0.1` (Zufallsport) aus und verbindet sie mit dem LAN-Server.
 
 ## Struktur
 
 ```
-hebocon/
-  __main__.py     Start, Fenster
-  config.py       HEBOCON_-Einstellungen
-  camera.py       Kamera-Thread
-  arena.py        Ecken, Entzerrung, Leerbild, Vordergrund
-  segmenter.py    EdgeTAM (optional): Registrierung und Video-Gedächtnis
-  tracking.py     Zwei Roboter-Plätze aus der Leerbild-Differenz, Aussehens-Abgleich, Schiedsrichter
-  game.py         HP-Regeln
-  app.py          Ablauf, Aktionen, Zustand, Paket
-  server.py       Starlette: Seiten, /api, /ws
-  web/            operator.html, stage.html, common.js
-tests/            pytest, synthetisch, ohne Modell und Kamera
-requirements/     Fachlichkeit
-data/             Laufzeitdaten (Ecken, Leerbild), nicht im Git
+hebo-server/
+  start.bat         Konsole mit Protokoll
+  hebocon/
+    __main__.py     Start, Konsolen-Banner, Logging
+    config.py       HEBOCON_-Einstellungen
+    camera.py       Kamera-Thread
+    arena.py        Ecken, Entzerrung, Leerbild, Vordergrund
+    segmenter.py    EdgeTAM (optional): Registrierung und Video-Gedächtnis
+    tracking.py     Zwei Roboter-Plätze aus der Leerbild-Differenz, Aussehens-Abgleich, Schiedsrichter
+    game.py         HP-Regeln
+    app.py          Ablauf, Aktionen, Zustand, Paket
+    lobby.py        Rollen, Tokens, Spielerplätze, lobby.json
+    discovery.py    UDP-Antwort für die Server-Suche
+    server.py       Starlette: /lobby, /api, /ws, /media
+  tests/            pytest, synthetisch, ohne Modell und Kamera
+  data/             Laufzeitdaten (Ecken, Leerbild, Medien, Balancing, Lobby), nicht im Git
+hebo-client/
+  start.bat         fragt name:
+  client.py         Suche, Anmeldung, Fenster
+  web/              operator.html, stage.html, player.html, common.js
+  client.json       letzter Server und Tokens, nicht im Git
+requirements/       Fachlichkeit
 ```
 
 ## Wo was liegt
 
 | Thema | Datei |
 | --- | --- |
-| Neue Bedienaktion | `do_<name>` in `app.py`, Knopf in `operator.html`, ggf. Taste in `common.js` |
+| Neue Bedienaktion | `do_<name>` in `app.py`, ggf. Recht in `server.py`, Knopf in `operator.html`, ggf. Taste in `common.js` |
 | Neues Zustandsfeld | `App.state()` in `app.py`, dann die Seiten |
 | Neue Regel | `game.py`, Wert in `config.py` |
 | Neuer Bühneneffekt | Ereignis in `game.py`, Darstellung in `stage.html` |

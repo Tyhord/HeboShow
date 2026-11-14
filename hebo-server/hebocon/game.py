@@ -10,9 +10,10 @@ import numpy as np
 
 from .config import Settings
 
-# Arena schrumpft auf Knopfdruck gleichmäßig auf diesen Flächenanteil; bewusst im Code, nicht in .env.
-SHRINK_MIN_AREA = 0.5
-SHRINK_DURATION_S = 30.0
+# Abstand zum Roboterumriss, damit Erkennungszittern ein frisches Objekt nicht sofort auslöst.
+SPAWN_CLEARANCE = 20.0
+# Genug Versuche, dass auch in einer fast vollen, geschrumpften Arena ein freier Platz gefunden wird.
+SPAWN_TRIES = 2000
 
 
 @dataclass
@@ -84,10 +85,6 @@ class Game:
         self.shrink_t0: float | None = None
         # Laufender Laser: Linie ist beim Zielen fest, damit der Gegner ausweichen kann.
         self.shot: dict | None = None
-        self._next_spawn = {
-            "obstacle": t + self._interval(cfg.obstacle_interval_s),
-            "powerup": t + self._interval(cfg.powerup_interval_s),
-        }
 
     def player(self, pid: int) -> Player:
         return next(p for p in self.players if p.id == pid)
@@ -103,8 +100,8 @@ class Game:
         """Erlaubtes Rechteck (x0, y0, x1, y1) in Arena-Einheiten, None solange nicht geschrumpft wird."""
         if self.shrink_t0 is None:
             return None
-        progress = min(1.0, max(0.0, (t - self.shrink_t0) / SHRINK_DURATION_S))
-        area = 1.0 - (1.0 - SHRINK_MIN_AREA) * progress
+        progress = min(1.0, max(0.0, (t - self.shrink_t0) / self.cfg.shrink_duration_s))
+        area = 1.0 - (1.0 - self.cfg.shrink_min_area) * progress
         w, h = self.size
         hw, hh = w / 2 * np.sqrt(area), h / 2 * np.sqrt(area)
         return w / 2 - hw, h / 2 - hh, w / 2 + hw, h / 2 + hh
@@ -121,9 +118,6 @@ class Game:
         rect = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], np.float32).reshape(-1, 1, 2)
         common, _ = cv2.intersectConvexConvex(hull, rect)
         return float(common) / total
-
-    def _interval(self, base: float) -> float:
-        return base * self.rng.uniform(0.7, 1.3)
 
     def _event(self, t: float, event_type: str, **data) -> None:
         self.events.append({"id": next(self._event_ids), "t": t, "type": event_type, **data})
@@ -148,7 +142,6 @@ class Game:
         self._ringout(t, dt, by_id)
         self._collision(t, by_id, contact)
         self._items(t, by_id)
-        self._spawner(t, robots)
         self._ulti(t, by_id)
         for p in self.players:
             r = by_id.get(p.id)
@@ -234,40 +227,36 @@ class Game:
                 self._event(t, "powerup", player=p.id, amount=round(healed, 1), pos=item.pos.tolist())
         self.items = keep
 
-    def _spawner(self, t: float, robots: list[RobotInput]) -> None:
-        cfg = self.cfg
-        for kind, limit, interval in (("obstacle", cfg.obstacle_max, cfg.obstacle_interval_s),
-                                      ("powerup", cfg.powerup_max, cfg.powerup_interval_s)):
-            if t < self._next_spawn[kind]:
-                continue
-            count = sum(1 for i in self.items if i.kind == kind)
-            spawned = count < limit and self.spawn(kind, t, robots)
-            # Ohne freien Platz bald erneut versuchen statt ein ganzes Intervall zu warten.
-            self._next_spawn[kind] = t + (self._interval(interval) if spawned or count >= limit else 1.0)
-
     def spawn(self, kind: str, t: float, robots: list[RobotInput]) -> bool:
         if self.finished:
             return False
         cfg = self.cfg
         obstacle = kind == "obstacle"
         radius = cfg.obstacle_radius if obstacle else cfg.powerup_radius
-        x0, y0, x1, y1 = self.zone(t) or (0.0, 0.0, *self.size)
-        margin = radius + 30
-        if x1 - x0 <= 2 * margin or y1 - y0 <= 2 * margin:
+        lifetime = cfg.obstacle_lifetime_s if obstacle else cfg.powerup_lifetime_s
+        # Die Zone schrumpft weiter; gemessen am Lebensende bleibt das Objekt die ganze Zeit vollständig drin.
+        x0, y0, x1, y1 = self.zone(t + lifetime) or (0.0, 0.0, *self.size)
+        if x1 - x0 < 2 * radius or y1 - y0 < 2 * radius:
             return False
-        for _ in range(80):
-            pos = np.array([self.rng.uniform(x0 + margin, x1 - margin),
-                            self.rng.uniform(y0 + margin, y1 - margin)], np.float32)
-            if any(np.linalg.norm(r.pos - pos) < r.radius + radius + 120 for r in robots if r.present):
+        for _ in range(SPAWN_TRIES):
+            pos = np.array([self.rng.uniform(x0 + radius, x1 - radius),
+                            self.rng.uniform(y0 + radius, y1 - radius)], np.float32)
+            if any(np.linalg.norm(i.pos - pos) < i.radius + radius for i in self.items):
                 continue
-            if any(np.linalg.norm(i.pos - pos) < i.radius + radius + 60 for i in self.items):
+            if any(self._near_robot(r, pos, radius + SPAWN_CLEARANCE) for r in robots):
                 continue
-            lifetime = cfg.obstacle_lifetime_s if obstacle else cfg.powerup_lifetime_s
             arming = cfg.obstacle_arming_s if obstacle else 0.0
             self.items.append(Item(next(self._ids), kind, pos, radius, t, t + lifetime, t + arming))
             self._event(t, "spawn", kind=kind, pos=pos.tolist())
             return True
         return False
+
+    @staticmethod
+    def _near_robot(r: RobotInput, pos: np.ndarray, distance: float) -> bool:
+        if r.outline is not None and len(r.outline) >= 3:
+            return touches(r.outline, pos, distance)
+        # Gerade nicht gesehen: Der Roboter steht vermutlich noch an der letzten Stelle.
+        return float(np.linalg.norm(r.pos - pos)) < r.radius + distance
 
     def ulti_charge(self, p: Player) -> float:
         if self.cfg.ulti_charge_hp <= 0:

@@ -5,6 +5,7 @@ import itertools
 import json
 import threading
 import time
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -98,8 +99,7 @@ class FakeModel:
 
 @pytest.fixture(params=["ohne Modell", "mit EdgeTAM"])
 def app(request):
-    cfg = Settings(segment_enabled=False, intro_s=0,
-                   obstacle_interval_s=1e6, powerup_interval_s=1e6, _env_file=None)
+    cfg = Settings(segment_enabled=False, intro_s=0, _env_file=None)
     a = App(cfg)
     a.camera = FakeCamera()
     # Beide Wege müssen tragen: Standard ist ohne Modell, EdgeTAM prüft optional nebenher.
@@ -388,16 +388,39 @@ def test_profile_reaches_state_and_keeps_fight_name(app):
     assert state["names"][0] == "A" and state["profiles"][0]["slogan"] == "Los!"
 
 
-def test_cue_counts_up_and_checks_kind(app):
-    assert app.state(time.monotonic())["cue"] is None
+def test_cue_toggles_each_meme_and_checks_kind(app):
+    a = {"url": "/media/1", "name": "x.mp3", "mime": "audio/mpeg"}
+    b = {"url": "/media/2", "name": "y.webm", "mime": "video/webm", "cutout": True}
+    assert app.state(time.monotonic())["memes"] == []
+    app.act("cue", {"kind": "media", "media": a})
+    app.act("cue", {"kind": "media", "media": b})
+    memes = app.state(time.monotonic())["memes"]
+    assert [(m["media"]["url"], m["paused"]) for m in memes] == [("/media/1", False), ("/media/2", False)]
+    assert all(0 <= m["x"] <= 1 and 0 <= m["y"] <= 1 for m in memes)
+    # Zweiter Klick pausiert nur dieses Meme, dritter setzt es mit gleicher ID fort.
+    app.act("cue", {"kind": "media", "media": a})
+    paused = app.state(time.monotonic())["memes"]
+    assert [m["paused"] for m in paused] == [True, False]
+    played = paused[0]["played"]
+    time.sleep(0.05)
+    assert app.state(time.monotonic())["memes"][0]["played"] == played
+    app.act("cue", {"kind": "media", "media": a})
+    resumed = app.state(time.monotonic())["memes"]
+    assert resumed[0]["id"] == memes[0]["id"] and not resumed[0]["paused"]
+    app.act("cue", {"kind": "ended", "id": memes[1]["id"]})
+    assert [m["media"]["url"] for m in app.state(time.monotonic())["memes"]] == ["/media/1"]
     app.act("cue", {"kind": "stop"})
-    app.act("cue", {"kind": "media", "media": {"url": "/media/1", "name": "x.mp3", "mime": "audio/mpeg"}})
-    cue = app.state(time.monotonic())["cue"]
-    assert cue["seq"] == 2 and cue["media"]["url"] == "/media/1"
+    assert app.state(time.monotonic())["memes"] == []
     with pytest.raises(UserError):
         app.act("cue", {"kind": "media"})
     with pytest.raises(UserError):
         app.act("cue", {"kind": "ko"})
+
+
+def test_meme_ends_without_stage_after_limit(app):
+    app.act("cue", {"kind": "media", "media": {"url": "/media/1", "name": "x", "mime": "image/png"}})
+    assert app.state(time.monotonic())["memes"]
+    assert app.state(time.monotonic() + 7)["memes"] == []
 
 
 def test_ko_button_ends_fight_for_that_robot(app):
@@ -430,3 +453,47 @@ def test_shrink_only_in_fight(app):
     # Rechteck mittig in der Arena, in Einheiten.
     assert len(zone) == 4 and 0 < zone[0][0] < W / 2 and 0 < zone[0][1] < H / 2
     assert zone[2][0] - zone[0][0] < W and zone[1][0] == zone[2][0]
+
+
+def test_balancing_survives_restart(tmp_path):
+    path = tmp_path / "balancing.json"
+    first = App(Settings(_env_file=None), path)
+    first.act("balancing", {"key": "obstacle_damage", "value": 42})
+    first.act("balancing", {"key": "shrink_min_area", "value": "0.3"})
+    assert json.loads(path.read_text("utf-8"))["obstacle_damage"] == 42
+
+    again = App(Settings(_env_file=None), path)
+    assert again.cfg.obstacle_damage == 42 and again.cfg.shrink_min_area == 0.3
+    assert again.state(time.monotonic())["balancing"]["obstacle_damage"] == 42
+
+    again.act("balancing_reset", {})
+    assert again.cfg.obstacle_damage == Settings(_env_file=None).obstacle_damage
+    assert not path.exists()
+
+
+def test_balancing_rejects_bad_values(tmp_path):
+    a = App(Settings(_env_file=None), tmp_path / "balancing.json")
+    for key, value in [("start_hp", 0), ("collision_damage", -1), ("collision_equal_ratio", 1.5),
+                       ("powerup_heal", None), ("powerup_heal", "viel"), ("powerup_heal", float("nan")),
+                       ("intro_s", 3), ("camera", 1)]:
+        with pytest.raises(UserError):
+            a.act("balancing", {"key": key, "value": value})
+    assert a.cfg.start_hp == 100 and a.cfg.intro_s == 7.5
+    assert not (tmp_path / "balancing.json").exists()
+
+
+def test_balancing_applies_to_running_fight(app):
+    register(app)
+    app.act("balancing", {"key": "collision_damage", "value": 33})
+    assert app.game.cfg.collision_damage == 33
+
+
+def test_operator_has_every_balancing_field():
+    from hebocon.config import BALANCING
+
+    # Prüft im Repo, ob Server und Bedienseite dieselben Werte kennen; ohne Client daneben entfällt das.
+    page_file = Path(__file__).resolve().parents[2] / "hebo-client" / "web" / "operator.html"
+    if not page_file.is_file():
+        pytest.skip("hebo-client liegt nicht neben hebo-server")
+    page = page_file.read_text("utf-8")
+    assert all(f'["{key}"' in page for key in BALANCING)

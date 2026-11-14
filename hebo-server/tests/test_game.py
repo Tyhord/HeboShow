@@ -11,8 +11,7 @@ from hebocon.game import Game, Item, RobotInput
 
 @pytest.fixture
 def cfg() -> Settings:
-    # Spawner praktisch aus, damit Tests deterministisch bleiben.
-    return Settings(obstacle_interval_s=1e9, powerup_interval_s=1e9, _env_file=None)
+    return Settings(_env_file=None)
 
 
 def robot(rid, pos, vel=(0, 0), inside=1.0, present=True, radius=40.0):
@@ -124,15 +123,57 @@ def test_spawn_keeps_clear_of_robots(cfg):
         g.items.clear()
         assert g.spawn("obstacle", 0.0, robots)
         item = g.items[0]
-        assert all(np.linalg.norm(item.pos - r.pos) >= r.radius + item.radius + 120 for r in robots)
+        assert all(np.linalg.norm(item.pos - r.pos) >= r.radius + item.radius for r in robots)
 
 
-def test_auto_spawn_respects_max():
-    cfg = Settings(obstacle_interval_s=1.0, powerup_interval_s=1e9, _env_file=None)
-    g = Game(cfg, [(1, "A"), (2, "B")], 0.0, random.Random(2))
-    for k in range(1, 100):
+def test_spawn_respects_robot_outline(cfg):
+    g = new_game(cfg)
+    # Langer Roboter: Der Kreis um die Mitte wäre zu klein, nur der Umriss schützt die Enden.
+    long = RobotInput(1, True, np.array([500, 500], np.float32), np.zeros(2, np.float32), 30.0, 1.0,
+                      np.array([[100, 470], [900, 470], [900, 530], [100, 530]], np.float32))
+    for _ in range(50):
+        assert g.spawn("powerup", 0.0, [long])
+    for item in g.items:
+        assert not (100 - item.radius < item.pos[0] < 900 + item.radius
+                    and 470 - item.radius < item.pos[1] < 530 + item.radius)
+
+
+def test_spawn_avoids_unseen_robot(cfg):
+    g = new_game(cfg)
+    hidden = RobotInput(1, False, np.array([500, 500], np.float32), np.zeros(2, np.float32), 80.0, 1.0, None)
+    for _ in range(15):
+        assert g.spawn("obstacle", 0.0, [hidden])
+    assert all(np.linalg.norm(i.pos - hidden.pos) >= hidden.radius + i.radius for i in g.items)
+
+
+def test_rapid_spawns_without_limit(cfg):
+    g = new_game(cfg)
+    robots = [robot(1, (300, 500)), robot(2, (700, 500))]
+    for _ in range(15):
+        assert g.spawn("obstacle", 0.0, robots)
+        assert g.spawn("powerup", 0.0, robots)
+    assert len(g.items) == 30
+    # Gleicher Zeitpunkt, trotzdem alle angenommen und ohne Überlappung untereinander.
+    for a in g.items:
+        assert 0 <= a.pos[0] - a.radius and a.pos[0] + a.radius <= 1000
+        assert 0 <= a.pos[1] - a.radius and a.pos[1] + a.radius <= 1000
+        for b in g.items:
+            if a is not b:
+                assert np.linalg.norm(a.pos - b.pos) >= a.radius + b.radius
+
+
+def test_spawn_fails_without_room(cfg):
+    g = Game(cfg, [(1, "A"), (2, "B")], 0.0, random.Random(1), size=(200.0, 200.0))
+    assert not g.spawn("obstacle", 0.0, [robot(1, (100, 100), radius=90)])
+    assert g.items == [] and not any(e["type"] == "spawn" for e in g.events)
+
+
+def test_nothing_spawns_without_button(cfg):
+    g = new_game(cfg)
+    for k in range(1, 3000):
         g.tick(k * 0.1, [robot(1, (100, 100)), robot(2, (900, 900))], False)
-    assert 1 <= sum(i.kind == "obstacle" for i in g.items) <= cfg.obstacle_max
+    assert g.items == []
+    assert not any(e["type"] == "spawn" for e in g.events)
 
 
 def test_ko_ends_match(cfg):
@@ -162,45 +203,50 @@ def test_lost_in_middle_drains(cfg):
 
 
 def test_shrink_reaches_min_area_and_drains(cfg):
-    from hebocon.game import SHRINK_DURATION_S, SHRINK_MIN_AREA
-
     g = new_game(cfg)
     assert g.zone(0.0) is None
     assert g.start_shrink(1.0) and not g.start_shrink(2.0)
     assert g.zone(1.0) == (0.0, 0.0, 1000.0, 1000.0)
-    x0, y0, x1, y1 = g.zone(1.0 + 2 * SHRINK_DURATION_S)
-    assert abs((x1 - x0) * (y1 - y0) / 1000.0**2 - SHRINK_MIN_AREA) < 1e-6
+    x0, y0, x1, y1 = g.zone(1.0 + 2 * cfg.shrink_duration_s)
+    assert abs((x1 - x0) * (y1 - y0) / 1000.0**2 - cfg.shrink_min_area) < 1e-6
     # Roboter nah am Rand: nach dem Schrumpfen draußen, in der Mitte bleibt alles ruhig.
-    t = 1.0 + SHRINK_DURATION_S
+    t = 1.0 + cfg.shrink_duration_s
     for k in range(31):
         g.tick(t + k * 0.1, [robot(1, (100, 500)), robot(2, (500, 500))], False)
     assert hp(g) == [87.5, 100]
 
 
 def test_spawn_stays_inside_zone(cfg):
-    from hebocon.game import SHRINK_DURATION_S
-
     g = new_game(cfg)
     g.start_shrink(0.0)
-    x0, y0, x1, y1 = g.zone(SHRINK_DURATION_S)
+    x0, y0, x1, y1 = g.zone(cfg.shrink_duration_s)
     for _ in range(5):
-        assert g.spawn("powerup", SHRINK_DURATION_S, [])
-        g.items.clear()
-        assert g.spawn("obstacle", SHRINK_DURATION_S, [])
-    for e in g.events:
-        if e["type"] == "spawn":
-            x, y = e["pos"]
-            assert x0 < x < x1 and y0 < y < y1
+        assert g.spawn("powerup", cfg.shrink_duration_s, [])
+        assert g.spawn("obstacle", cfg.shrink_duration_s, [])
+    for item in g.items:
+        x, y = item.pos
+        r = item.radius
+        assert x0 <= x - r and x + r <= x1 and y0 <= y - r and y + r <= y1
+
+
+def test_spawn_during_shrink_stays_inside_until_expiry(cfg):
+    g = new_game(cfg)
+    g.start_shrink(0.0)
+    for _ in range(10):
+        assert g.spawn("obstacle", 1.0, [])
+    for item in g.items:
+        x0, y0, x1, y1 = g.zone(item.expires)
+        x, y = item.pos
+        r = item.radius
+        assert x0 <= x - r and x + r <= x1 and y0 <= y - r and y + r <= y1
 
 
 def test_zone_keeps_aspect_of_rectangular_arena(cfg):
-    from hebocon.game import SHRINK_DURATION_S, SHRINK_MIN_AREA
-
     g = Game(cfg, [(1, "A"), (2, "B")], 0.0, random.Random(1), size=(1000.0, 500.0))
     g.start_shrink(0.0)
-    x0, y0, x1, y1 = g.zone(SHRINK_DURATION_S)
+    x0, y0, x1, y1 = g.zone(cfg.shrink_duration_s)
     assert (x0 + x1) / 2 == 500.0 and (y0 + y1) / 2 == 250.0
-    assert abs((x1 - x0) * (y1 - y0) / (1000.0 * 500.0) - SHRINK_MIN_AREA) < 1e-6
+    assert abs((x1 - x0) * (y1 - y0) / (1000.0 * 500.0) - cfg.shrink_min_area) < 1e-6
 
 def charged_game(cfg):
     g = new_game(cfg)

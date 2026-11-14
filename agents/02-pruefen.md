@@ -4,17 +4,22 @@
 
 ## Befehle
 
+Alles im Ordner `hebo-server`:
+
 ```powershell
-# Tests: Regeln, Arena, Tracking, kompletter Ablauf mit Fake-Kamera
+# Tests: Regeln, Arena, Tracking, Lobby, kompletter Ablauf mit Fake-Kamera
 .venv\Scripts\python -m pytest -q
 
-# Lint
-.venv\Scripts\python -m ruff check hebocon tests
+# Lint (Server und Client-Launcher)
+.venv\Scripts\python -m ruff check hebocon tests ..\hebo-client\client.py
 
-# Import und Start ohne Fenster
+# Import und Start (nur Konsole)
 .venv\Scripts\python -c "import hebocon.server; print('ok')"
-.venv\Scripts\python -m hebocon --no-window --camera pfad\zu\video.mp4
+.venv\Scripts\python -m hebocon --camera pfad\zu\video.mp4
 ```
+
+Client danach im Ordner `hebo-client`: `.venv\Scripts\python client.py --server 127.0.0.1`.
+Für Rollen-Tests mehrere Clients starten (`stage`, `mod`, zwei Spielernamen).
 
 Die Tests brauchen weder echtes Modell noch Kamera. Der Ablauf läuft zweimal: ohne Modell
 und mit einem Fake-EdgeTAM. Auf Windows meldet pytest eine „access violation“ beim Import

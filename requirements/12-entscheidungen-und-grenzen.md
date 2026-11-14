@@ -5,8 +5,9 @@
 ## Entscheidungen
 
 **Bühnen-Einblendungen laufen über den App-Zustand.**
-Medien und VS-Bildschirm kommen als `cue`/`vs`/`profiles` im Zustand an, nicht von Fenster
-zu Fenster. So klappt es gleich, ob Bühne und Bedienung in pywebview oder in getrennten
+Medien und VS-Bildschirm kommen als `memes`/`vs`/`profiles` im Zustand an, nicht von Fenster
+zu Fenster. Die App führt die Liste laufender Memes samt Pause, gespielter Zeit und
+Position; jede Bühne gleicht sich daran ab, auch eine später geöffnete. So klappt es gleich, ob Bühne und Bedienung in pywebview oder in getrennten
 Browsern laufen. Die K.O.-Knöpfe gehen dagegen über die Spielregeln (`ko`), damit HP,
 Sieger und Kampfzeit stimmen. Soundboard-Dateien liegen in `data/media/` und überleben einen
 Neustart, damit Memes nicht vor jeder Veranstaltung neu hochgeladen werden müssen. Steckbriefe
@@ -15,19 +16,45 @@ sind nicht dauerhaft; ihre Bilder löscht die App deshalb beim nächsten Start.
 **Laser-Ulti lädt durch Schaden und ist ausweichbar.**
 Die Ulti lädt nur über erlittenen Schaden, damit sie als Comeback-Mittel wirkt und nicht
 gleich zu Beginn verpufft. Die Ziellinie steht 1,2 s vorher fest, damit ein Treffer
-fahrerisches Können belohnt und kein sicherer Schaden auf Knopfdruck ist. Ausgelöst wird
-sie von der Moderation, weil die Teams keinen eigenen Knopf haben.
+fahrerisches Können belohnt und kein sicherer Schaden auf Knopfdruck ist. Auslösen kann die
+Moderation für beide und jeder angemeldete Spieler für seinen eigenen Roboter.
 
 **Autoplay mit Ton in den App-Fenstern.**
-`__main__.py` startet WebView2 mit `--autoplay-policy=no-user-gesture-required`, sonst
-blockiert die Bühne Memes mit Ton, bis jemand hineinklickt. Ist
-`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` schon gesetzt, gilt der vorhandene Wert.
+`hebo-client/client.py` startet WebView2 mit `--autoplay-policy=no-user-gesture-required`,
+sonst blockiert die Bühne Memes mit Ton, bis jemand hineinklickt. Ist
+`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` schon gesetzt, gilt der vorhandene Wert. Jedes
+Bühnenfenster spielt den Ton, auch das der Moderation und der Spieler.
 
-**Eine native Python-App statt Backend, Frontend und Docker.**
-Alles läuft auf einem Laptop. Der Weg Kamera → Python → Bild ist kürzer, Kamerazugriff
-unter Windows klappt ohne Docker-Durchreichung, und es gibt nur noch einen Start-Befehl.
-Die Oberfläche bleibt HTML/Canvas in pywebview, weil Effekte dort einfacher sind als in
-OpenCV-Fenstern. Abhängigkeiten verwaltet `uv` im Projekt-`.venv`.
+**Green-Screen-Memes werden vorab freigestellt, nicht live.**
+`hebocon.memes` rechnet das Grün einmalig heraus und speichert WebM (VP9) mit echtem
+Alphakanal. Live-Keying im Browser würde bei jedem Abspielen Rechenzeit neben dem Tracking
+kosten und auf jeder Bühne einzeln laufen. Zuschnitt auf den Inhalt und höchstens 720 px
+halten Dateien und Dekodierung klein. Grenze: Echtes Grün direkt an der Motivkante kann
+mit verschwinden; Grün im Motiv bleibt.
+
+**Ein Server, beliebig viele Clients im LAN.**
+Kamera, Tracking und Regeln laufen genau einmal auf dem Rechner an der Kamera; nur so sehen
+alle Bühnen denselben Kampf und niemand rechnet etwas anders. Clients sind dünn: Sie
+liefern die Seiten selbst über einen lokalen Mini-Server aus und holen alles andere vom
+Server. So brauchen sie weder Kamera noch Torch und starten auf jedem Windows-Gerät.
+Server und Client haben je ein eigenes `.venv`, verwaltet mit `uv`. Kein Docker, kein
+Internet. Die Oberfläche bleibt HTML/Canvas in pywebview, weil Effekte dort einfacher sind
+als in OpenCV-Fenstern.
+
+**Rollen per Name, Passwort und Rechte nur auf dem Server.**
+Ein Name statt Menü reicht für eine Veranstaltung. Das Moderationspasswort steht nur in der
+Server-`.env`, die Seiten kennen es nie. Jede Anfrage trägt ein Token; der Server prüft die
+Rolle bei jeder Aktion, Bühnen und Spieler können also auch mit eigenem Code nichts
+steuern außer ihrer eigenen Ulti.
+
+**Spieler-Identität getrennt von der Verbindung.**
+Name, Platz und Token liegen in `data/lobby.json`. Ein kurzer WLAN-Aussetzer oder ein
+Neustart des Clients kostet so keinen Platz; erst „Platz freigeben“ (Fenster schließen) oder
+„Entfernen“ durch die Moderation macht ihn frei. Der Name bleibt auch dann gespeichert.
+
+**Suche per UDP-Broadcast, IP als Rückfall.**
+Im selben Subnetz findet der Client den Server ohne Eingabe. Netze, die Broadcasts sperren
+(Gäste-WLAN), brauchen die IP aus der Server-Konsole; der Client merkt sie sich.
 
 **Tracking über die Leerbild-Differenz, EdgeTAM nur optional als Schiedsrichter.**
 Live-Tracking mit EdgeTAM schaffte selbst auf einer NVIDIA-GPU nur rund 2 Bilder/s. Die
@@ -49,10 +76,23 @@ Mit `cv2.warpPerspective` entsteht eine Draufsicht nur der Arena. Was außerhalb
 überall in der Arena gleich. Der Ringout wird dafür an der Kante gemessen: sichtbarer
 Anteil im Verhältnis zur Registrierungsfläche. Wer ganz hinausfährt, ist K.o.
 
-**Schrumpfende Arena als mittiges Quadrat mit festen Werten.**
-50 % Fläche in 30 s, linear. Ein Quadrat in Arena-Einheiten ist einfach zu prüfen und
-auf der Bühne klar zu zeigen. Die Werte stehen bewusst im Code statt in der `.env`, weil
-sie Spielregel und keine Einrichtung sind.
+**Schrumpfende Arena als mittiges Quadrat.**
+Standard 50 % Fläche in 30 s, linear. Ein Quadrat in Arena-Einheiten ist einfach zu prüfen
+und auf der Bühne klar zu zeigen. Fläche und Dauer sind wie alle Spielregel-Werte im
+Balancing einstellbar.
+
+**Balancing live in der Bedienung, gespeichert in `data/balancing.json`.**
+Zwischen zwei Kämpfen soll die Moderation nachjustieren können, ohne die App neu zu starten
+und dabei Kalibrierung und Registrierung zu verlieren. Angeboten werden nur die vorhandenen
+Spielregel-Werte; Multiplikatoren für Schaden oder Heilung gibt es nicht, weil die Regeln
+keine kennen. Die Werte gehören dem Server und kommen über den Zustand zu Bedienung und
+Bühne, damit beide nie auseinanderlaufen. Radius und Lebensdauer werden beim Spawnen ins
+Objekt übernommen und gelten daher erst für neue Objekte, Start-HP erst ab dem nächsten Kampf
+(im laufenden Kampf ändert sich nur die Obergrenze fürs Heilen).
+
+**Hindernisse und Power-ups nur von Hand.**
+Die Moderation bestimmt das Tempo der Show; zufällig auftauchende Objekte störten Ansagen
+und Dramaturgie. Deshalb gibt es weder Spawn-Intervall noch Obergrenze, nur die Knöpfe.
 
 **Bedienung als Assistent mit automatischer Erkennung.**
 Die Moderation soll nicht nachdenken müssen: ein Schritt, ein Hauptknopf. Erkennung startet
@@ -106,3 +146,7 @@ wieder die CPU-Variante einspielen.
   Ringout zählt deshalb erst ab mehr als halber Fläche draußen.
 * **EdgeTAM braucht beim ersten Start Internet** zum Laden. Danach liegt es im
   Hugging-Face-Cache.
+* **Nur fürs vertraute LAN.** HTTP und WebSocket laufen unverschlüsselt; Passwort und
+  Tokens sind im Netz mitlesbar. Nicht ins Internet freigeben.
+* **Höchstens zwei Spieler.** Ein dritter Name bekommt „Beide Spielerplätze sind belegt“
+  und kann als Bühne zuschauen.

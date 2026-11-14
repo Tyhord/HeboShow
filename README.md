@@ -11,49 +11,77 @@ Roboter, verfolgt sie, führt HP und zeigt Effekte für das Publikum.
   erkannt
 * Roboter werden über die Differenz zum Leerbild verfolgt, 30 Bilder/s ohne GPU;
   EdgeTAM kann optional nebenher die Identitäten prüfen
-* Eine native Python-App mit zwei Fenstern: **Bühne** und **Bedienung**
+* Ein **Server** (`hebo-server/`) rechnet alles: Kamera, Tracking, HP, Effekte, Balancing,
+  Spieler und gespeicherte Daten. Beliebig viele **Clients** (`hebo-client/`) im selben
+  LAN zeigen Bühne, Bedienung oder Spieleransicht. Internet ist nicht nötig.
 
 ## Start
 
-Windows, Python 3.12.
+Windows, Python 3.12 auf jedem Gerät. Beim ersten Start installiert jede `start.bat` ihre
+Pakete selbst ins eigene `.venv`.
 
-Am einfachsten per Doppelklick auf `start.bat`. Beim ersten Start installiert sie alle
-Pakete ins `.venv`. Argumente werden durchgereicht, z.B. `start.bat --camera 1`.
+### Server (ein Rechner, an dem die Kamera hängt)
 
-Von Hand:
+Doppelklick auf `hebo-server\start.bat`. Es öffnet sich nur eine Konsole mit LAN-Adresse,
+Port, Kamera und laufendem Protokoll (Anmeldungen, Verbindungen, Aktionen, Fehler).
+Argumente werden durchgereicht, z.B. `start.bat --camera 1` oder
+`start.bat --camera C:\pfad\kampf.mp4`.
+
+Beim ersten Start fragt die Windows-Firewall nach `python.exe`: für **private Netzwerke**
+erlauben. Gebraucht werden TCP 8765 (Spiel) und UDP 8766 (automatische Suche).
+
+Einstellungen: `hebo-server\.env.example` nach `hebo-server\.env` kopieren und anpassen,
+z.B. `HEBOCON_MOD_PASSWORD` (Standard `admin`).
+
+### Client (beliebig viele Geräte, auch derselbe Rechner)
+
+Den Ordner `hebo-client` auf das Gerät kopieren und `start.bat` doppelklicken. Der Client
+sucht den Server im LAN. Findet er keinen, fragt er nach der IP (die steht in der
+Server-Konsole). Der letzte Server wird in `client.json` gemerkt. Fest vorgeben geht mit
+`start.bat --server 192.168.0.10`.
+
+Dann fragt er `name:`:
+
+| Eingabe | Rolle | Fenster |
+| --- | --- | --- |
+| `stage` | Bühne | Kampfansicht, beliebig viele gleichzeitig |
+| `mod` oder `moderator` | Moderation, fragt nach dem Passwort | Kampfansicht und Bedienung |
+| jeder andere Name | Spieler 1 bzw. 2 | Kampfansicht und Spieleransicht mit HP und Laser-Ulti (Leertaste) |
+
+Spielernamen sind eindeutig (Groß-/Kleinschreibung egal) und werden zum Roboternamen.
+Sind beide Plätze belegt, bietet der Client an, als Bühne zu verbinden. Wer denselben
+Namen auf demselben Gerät wieder eingibt, bekommt seinen Platz zurück. Beim Schließen
+gibt ein Spieler seinen Platz frei; die Moderation kann Spieler im Tab „Roboter“ entfernen.
+
+### Ohne start.bat
 
 ```powershell
+cd hebo-server
 python -m pip install --user uv
 python -m uv sync
-.venv\Scripts\python -m hebocon
+.venv\Scripts\python -m hebocon --camera 0
+
+cd ..\hebo-client
+python -m uv sync
+.venv\Scripts\python client.py
 ```
 
 EdgeTAM ist standardmäßig aus und lohnt sich nur mit NVIDIA-GPU. Einschalten mit
-`HEBOCON_SEGMENT_ENABLED=true` in `.env`, nach `uv sync` die CUDA-Variante ins `.venv`
-holen und danach nicht mit `uv run` starten, das stellt wieder auf CPU um:
+`HEBOCON_SEGMENT_ENABLED=true` in `hebo-server\.env`, nach `uv sync` die CUDA-Variante ins
+`.venv` des Servers holen und danach nicht mit `uv run` starten, das stellt wieder auf CPU um:
 
 ```powershell
+cd hebo-server
 python -m uv pip install --reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu128
 .venv\Scripts\python -c "import torch; print(torch.cuda.is_available())"
 ```
 
 Die Bedienung zeigt dann `EdgeTAM (GPU: …) prüft nebenher`.
 
-Andere Kamera oder Testvideo:
+Kamera als VDO.Ninja-Stream: `start.bat --camera "https://vdo.ninja/?view=meinStream"`.
 
-```powershell
-.venv\Scripts\python -m hebocon --camera 1
-.venv\Scripts\python -m hebocon --camera C:\pfad\kampf.mp4
-.venv\Scripts\python -m hebocon --camera "https://vdo.ninja/?view=meinStream"
-```
-
-Ohne Fenster, dann im Browser `http://127.0.0.1:8765/` (Bedienung) und `/stage` (Bühne):
-
-```powershell
-.venv\Scripts\python -m hebocon --no-window
-```
-
-Einstellungen: `.env.example` nach `.env` kopieren und anpassen.
+`Hebocontroller/` ist ein eigenständiger Roboter-Controller und gehört nicht zu Server
+oder Client.
 
 ## Ablauf in Kürze
 

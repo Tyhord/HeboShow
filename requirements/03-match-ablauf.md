@@ -14,13 +14,21 @@
 | `fight` | Kampf läuft |
 | `finished` | Sieger steht fest, Bild läuft weiter |
 
+## 0. Spieler anmelden (optional)
+
+Spieler melden sich am Client mit ihrem Namen an (siehe [04-bedienung.md](04-bedienung.md)).
+Der erste freie Platz wird Roboter 1, der nächste Roboter 2; der Name wird sofort zum
+Roboternamen auf allen Bildschirmen. Meldet sich jemand während eines Kampfs an oder um,
+gilt der Name ab dem nächsten Kampf. Ohne angemeldete Spieler läuft alles wie bisher, die
+Moderation trägt die Namen selbst ein.
+
 ## 1. Arena einrichten (einmal pro Sitzung)
 
 1. Arena **leer** räumen.
 2. „Ecken anklicken“ und die vier Ecken der Arena im Bild anklicken. Esc bricht ab.
 3. Direkt danach nimmt die App von selbst rund 30 Bilder auf und bildet daraus das
    Leerbild. Die Arena bleibt dabei leer.
-4. Ecken und Leerbild werden in `data/` gespeichert und beim nächsten Start geladen.
+4. Ecken und Leerbild werden auf dem Server in `data/` gespeichert und beim nächsten Start geladen.
 
 Ändert sich das Licht stark oder wurde die Kamera bewegt: „Nur Leerbild neu aufnehmen“.
 
@@ -52,7 +60,7 @@ Im Normalfall also: N, Name, Enter, Name, Enter, S.
   Das Tracking läuft dabei einfach weiter. Schaden, Spawnen und Schrumpfen gibt es erst
   nach dem Countdown.
 * Die Kampfzeit zählt hoch, ohne Zeitlimit, und bleibt beim Ende stehen.
-* Hindernisse und Power-ups kommen automatisch, zusätzlich per Knopf.
+* Hindernisse und Power-ups kommen nur per Knopf, nie automatisch.
 * „Arena schrumpfen“ startet das Schrumpfen (siehe [02-spielregeln.md](02-spielregeln.md)).
 * „Kampf abbrechen“ geht jederzeit, auch während Intro, VS-Bildschirm und Countdown, und
   führt zurück nach `register`.

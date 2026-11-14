@@ -30,3 +30,6 @@ dist/
 .DS_Store
 .idea/
 *.swp
+
+# Client-Einstellungen pro Gerät (letzter Server, Anmeldungen)
+hebo-client/client.json
