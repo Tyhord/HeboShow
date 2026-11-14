@@ -3,15 +3,41 @@
 
 import argparse
 import logging
+import socket
+import sys
 import threading
 
 import uvicorn
 
-from . import discovery
+from . import discovery, network
 from .app import App
-from .config import BALANCING_FILE, LOBBY_FILE, settings
+from .config import BALANCING_FILE, LOBBY_FILE, NETWORK_FILE, settings
 from .lobby import Lobby
 from .server import create_server
+
+
+def pick_adapter() -> network.Adapter | None:
+    """Wählt den Adapter so lange, bis der Port auf seiner IP frei ist; None = nur dieser Rechner."""
+    while True:
+        adapter = network.choose(NETWORK_FILE)
+        if adapter is None:
+            print("  Kein verbundener Netzwerkadapter gefunden. Der Server läuft nur auf diesem Rechner "
+                  "(127.0.0.1); andere Geräte erreichen ihn nicht.")
+        ip = adapter.ip if adapter else "127.0.0.1"
+        try:
+            # Vorab prüfen, damit belegter Port oder getrennter Adapter verständlich gemeldet wird.
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.bind((ip, settings.port))
+            return adapter
+        except OSError as exc:
+            print(f"  {ip}:{settings.port} lässt sich nicht nutzen ({exc.strerror or exc}). "
+                  "Läuft der Server schon, oder ist der Adapter gerade getrennt worden?")
+            if sys.stdin is None or not sys.stdin.isatty():
+                raise SystemExit(1) from exc
+            try:
+                input("  Enter = Adapterliste neu laden: ")
+            except EOFError:
+                raise SystemExit(1) from exc
 
 
 def main() -> None:
@@ -25,26 +51,39 @@ def main() -> None:
     if args.camera:
         settings.camera = args.camera
 
+    adapter = None
+    host = settings.host
+    if not host:
+        adapter = pick_adapter()
+        host = adapter.ip if adapter else "127.0.0.1"
+
     lobby = Lobby(LOBBY_FILE, settings.mod_password)
     app = App(settings, BALANCING_FILE, lobby)
     app.start()
     stop = threading.Event()
+    subnet = adapter.subnet if adapter else None
     threading.Thread(target=discovery.serve, name="discovery", daemon=True,
-                     args=(settings.discovery_port, settings.port, lobby.server_id, stop)).start()
+                     args=(settings.discovery_port, settings.port, lobby.server_id, stop,
+                           None if host == "0.0.0.0" else host, subnet, network.own_addresses())).start()
+    if adapter:
+        threading.Thread(target=network.watch, name="netwatch", daemon=True, args=(adapter, stop)).start()
 
-    ips = discovery.lan_addresses() if settings.host in ("0.0.0.0", "") else [settings.host]
+    ips = discovery.lan_addresses() if host == "0.0.0.0" else [host]
     print("=" * 60)
     print(" HEBOCON SERVER")
+    if adapter:
+        print(f"   Netzwerkadapter:      {adapter.name}")
     for ip in ips or ["127.0.0.1"]:
         print(f"   Adresse für Clients:  {ip}:{settings.port}")
-    print(f"   Automatische Suche:   UDP {settings.discovery_port}")
+    print(f"   Automatische Suche:   UDP {settings.discovery_port}"
+          + (f" (nur Netz {subnet})" if subnet else ""))
     print(f"   Kamera:               {settings.camera}")
     if settings.mod_password == "admin":
         print("   Moderations-Passwort: admin (änderbar per HEBOCON_MOD_PASSWORD in .env)")
     print("   Beenden mit Strg+C oder durch Schließen dieses Fensters.")
     print("=" * 60, flush=True)
 
-    server = uvicorn.Server(uvicorn.Config(create_server(app, lobby=lobby), host=settings.host,
+    server = uvicorn.Server(uvicorn.Config(create_server(app, lobby=lobby), host=host,
                                            port=settings.port, log_level="warning", ws_ping_interval=10))
     try:
         server.run()

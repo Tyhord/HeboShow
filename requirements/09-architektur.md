@@ -13,7 +13,8 @@ Zwei getrennte Programme im LAN, kein Docker, kein Internet:
 
 | Modul | Aufgabe |
 | --- | --- |
-| `hebocon/__main__.py` | Start: Logging, Konsolen-Banner mit LAN-Adressen, Suche, uvicorn |
+| `hebocon/__main__.py` | Start: Logging, Adapterwahl, Konsolen-Banner, Suche, uvicorn auf der gewählten IP |
+| `hebocon/network.py` | Netzwerkadapter auflisten, in der Konsole wählen, in `data/network.json` merken, überwachen |
 | `hebocon/config.py` | Alle Einstellungen (`HEBOCON_`), Grenzen der Balancing-Werte |
 | `hebocon/app.py` | Ablaufsteuerung, Phasen, Aktionen, Zustand; Balancing laden und in `data/balancing.json` speichern |
 | `hebocon/lobby.py` | Rollen, Tokens, Moderationspasswort, Spielerplätze; gespeichert in `data/lobby.json` |
@@ -47,7 +48,8 @@ Zwei getrennte Programme im LAN, kein Docker, kein Internet:
 | `model-load` | lädt EdgeTAM einmal beim Start, nur wenn eingeschaltet |
 | `edgetam` | nur mit EdgeTAM: prüft ab und zu ein Bild, das Tracking wartet nie darauf |
 | Hintergrund-Aktionen | Scan, Segmentierung bei der Registrierung |
-| `discovery` | beantwortet UDP-Suchanfragen |
+| `discovery` | beantwortet UDP-Suchanfragen aus dem Netz des gewählten Adapters |
+| `netwatch` | prüft alle 5 s, ob der gewählte Adapter noch verbunden ist, und warnt in der Konsole |
 | Hauptthread | uvicorn, Aktionen laufen per `asyncio.to_thread` |
 
 Gemeinsamer Zustand ist durch eine Sperre in `app.py` geschützt, die Lobby durch eine

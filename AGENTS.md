@@ -101,7 +101,7 @@ cd ..\hebo-client; python -m uv sync
 # Server: nur Konsole, kein Fenster
 cd hebo-server; .venv\Scripts\python -m hebocon --camera 0
 # Client: fragt nach name: (stage, mod oder Spielername)
-cd hebo-client; .venv\Scripts\python client.py --server 127.0.0.1
+cd hebo-client; .venv\Scripts\python client.py --server <LAN-IP aus der Server-Konsole>
 
 # Prüfen (im Ordner hebo-server)
 .venv\Scripts\python -m pytest -q

@@ -18,7 +18,9 @@ Alles im Ordner `hebo-server`:
 .venv\Scripts\python -m hebocon --camera pfad\zu\video.mp4
 ```
 
-Client danach im Ordner `hebo-client`: `.venv\Scripts\python client.py --server 127.0.0.1`.
+Client danach im Ordner `hebo-client`: `.venv\Scripts\python client.py` (findet den Server
+selbst) oder `--server <LAN-IP aus der Server-Konsole>`; `127.0.0.1` geht nicht, der Server
+lauscht nur auf dem gewählten Adapter.
 Für Rollen-Tests mehrere Clients starten (`stage`, `mod`, zwei Spielernamen).
 
 Die Tests brauchen weder echtes Modell noch Kamera. Der Ablauf läuft zweimal: ohne Modell

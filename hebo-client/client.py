@@ -108,8 +108,9 @@ def discover(seconds: float = 2.0) -> list[tuple[str, str]]:
             except ValueError:
                 continue
             if info.get("app") == "hebocon":
-                found.setdefault(f"{addr[0]}:{info.get('port', DEFAULT_PORT)}", str(info.get("id", "")))
-    # Derselbe Server antwortet über mehrere Wege (127.0.0.1 und LAN); die LAN-Adresse taugt auch für andere.
+                found.setdefault(f"{info.get('ip') or addr[0]}:{info.get('port', DEFAULT_PORT)}",
+                                 str(info.get("id", "")))
+    # Ältere Server ohne "ip" antworten über mehrere Wege; die LAN-Adresse taugt auch für andere.
     unique: dict[str, str] = {}
     for server, sid in sorted(found.items(), key=lambda x: x[0].startswith("127.")):
         if sid not in unique:

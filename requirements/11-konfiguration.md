@@ -10,7 +10,7 @@ setzen. Vorlage: [`../hebo-server/.env.example`](../hebo-server/.env.example). N
 
 | Variable | Standard | Wirkung |
 | --- | --- | --- |
-| `HEBOCON_HOST` | `0.0.0.0` | Adresse, auf der der Server lauscht; `0.0.0.0` = alle Netzwerke |
+| `HEBOCON_HOST` | leer | Leer = Netzwerkadapter beim Start wählen (gemerkt in `data/network.json`); feste IP = nur diese; `0.0.0.0` = alle Netzwerke |
 | `HEBOCON_PORT` | `8765` | TCP-Port für HTTP und WebSocket |
 | `HEBOCON_DISCOVERY_PORT` | `8766` | UDP-Port für die automatische Suche der Clients |
 | `HEBOCON_MOD_PASSWORD` | `admin` | Passwort der Moderation, nur auf dem Server |

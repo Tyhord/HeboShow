@@ -8,8 +8,8 @@
 * Torch nur CPU (eigener Index in `pyproject.toml`).
 * Modell `yonigozlan/EdgeTAM-hf` über `transformers`, braucht `timm`. Wird beim ersten
   Start in den Hugging-Face-Cache geladen.
-* Server: ein Prozess, Port **8765** (HTTP/WebSocket) auf `0.0.0.0`, UDP **8766** für die
-  Suche im LAN. Keine Fenster, nur Konsole.
+* Server: ein Prozess, Port **8765** (HTTP/WebSocket) nur auf der IP des beim Start
+  gewählten Netzwerkadapters, UDP **8766** für die Suche im LAN. Keine Fenster, nur Konsole.
 * Client: eigenes `.venv` mit nur `pywebview`. Liefert die Seiten über einen lokalen
   Mini-Server auf `127.0.0.1` (Zufallsport) aus und verbindet sie mit dem LAN-Server.
 
@@ -19,7 +19,8 @@
 hebo-server/
   start.bat         Konsole mit Protokoll
   hebocon/
-    __main__.py     Start, Konsolen-Banner, Logging
+    __main__.py     Start, Adapterwahl, Konsolen-Banner, Logging
+    network.py      Netzwerkadapter auflisten, wählen, merken (network.json), überwachen
     config.py       HEBOCON_-Einstellungen
     camera.py       Kamera-Thread
     arena.py        Ecken, Entzerrung, Leerbild, Vordergrund

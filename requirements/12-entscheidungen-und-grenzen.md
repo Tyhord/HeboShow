@@ -56,6 +56,14 @@ Neustart des Clients kostet so keinen Platz; erst „Platz freigeben“ (Fenster
 Im selben Subnetz findet der Client den Server ohne Eingabe. Netze, die Broadcasts sperren
 (Gäste-WLAN), brauchen die IP aus der Server-Konsole; der Client merkt sie sich.
 
+**Server an genau einen Netzwerkadapter gebunden.**
+Mit WSL, VPN oder zweitem Netz wäre der Server bei `0.0.0.0` in allen Netzen sichtbar und
+das Banner zeigte mehrere Adressen. Die Auswahl beim Start legt das Spielnetz fest; UDP-Suche
+beantwortet der Server nur dort. Der UDP-Socket selbst hört auf allen Adaptern, weil Windows
+Broadcasts an einen auf eine feste IP gebundenen Socket nicht verlässlich zustellt; gefiltert
+wird über das Subnetz des Absenders. Grenze: Wechselt der Adapter seine IP, muss der Server
+neu starten; die Konsole warnt dann.
+
 **Tracking über die Leerbild-Differenz, EdgeTAM nur optional als Schiedsrichter.**
 Live-Tracking mit EdgeTAM schaffte selbst auf einer NVIDIA-GPU nur rund 2 Bilder/s. Die
 Leerbild-Differenz mit zwei festen Plätzen und Abgleich über Farbe und Umriss schafft auf

@@ -62,7 +62,8 @@
 
 * Erster Serverstart: Windows-Firewall fragt nach `python.exe`. Ohne Freigabe für private
   Netze finden Clients auf anderen Geräten den Server nicht (TCP 8765, UDP 8766).
-* Das Server-Banner listet auch virtuelle Adapter (WSL, Hyper-V, z.B. `172.x`). Die echte
-  LAN-Adresse ist meist `192.168.x.x`.
+* Der Server lauscht nur auf dem gewählten Adapter. Virtuelle Adapter (WSL, Hyper-V,
+  `172.x`) stehen mit in der Liste; das Spielnetz ist meist `192.168.x.x`. Lokale Tests
+  daher mit der LAN-IP, nicht `127.0.0.1`. Gemerkt wird die Wahl in `data\network.json`.
 * Die Seiten kommen vom Client, nicht vom Server. Pfade in `web/` daher relativ halten und
   Server-Adressen nur über `api()`/`mediaUrl()` aus `common.js` bilden.

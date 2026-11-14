@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     camera_width: int = 1280
     camera_height: int = 720
 
-    # 0.0.0.0, damit Clients im LAN den Server erreichen; 127.0.0.1 sperrt andere Geräte aus.
-    host: str = "0.0.0.0"
+    # Leer = Netzwerkadapter beim Start wählen; feste IP oder 0.0.0.0 überspringt die Auswahl.
+    host: str = ""
     port: int = 8765
     discovery_port: int = 8766
     # Liegt nur auf dem Server, damit kein Client das Passwort im Quelltext mitliefert.
@@ -77,5 +77,6 @@ BALANCING: dict[str, tuple[float, float | None]] = {
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 BALANCING_FILE = DATA_DIR / "balancing.json"
 LOBBY_FILE = DATA_DIR / "lobby.json"
+NETWORK_FILE = DATA_DIR / "network.json"
 
 settings = Settings()

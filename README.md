@@ -22,8 +22,12 @@ Pakete selbst ins eigene `.venv`.
 
 ### Server (ein Rechner, an dem die Kamera hängt)
 
-Doppelklick auf `hebo-server\start.bat`. Es öffnet sich nur eine Konsole mit LAN-Adresse,
-Port, Kamera und laufendem Protokoll (Anmeldungen, Verbindungen, Aktionen, Fehler).
+Doppelklick auf `hebo-server\start.bat`. Hat der Rechner mehrere Netzwerkadapter, zeigt die
+Konsole zuerst eine nummerierte Liste mit Name, IPv4-Adresse und Status. Nummer eingeben,
+und der Server ist nur über diesen Adapter erreichbar und auffindbar. Die Wahl wird gemerkt
+und beim nächsten Start nach 10 s oder mit Enter wieder genommen; eine andere Nummer wechselt.
+Danach zeigt die Konsole Adapter, Adresse für Clients, Port, Kamera und das laufende Protokoll
+(Anmeldungen, Verbindungen, Aktionen, Fehler).
 Argumente werden durchgereicht, z.B. `start.bat --camera 1` oder
 `start.bat --camera C:\pfad\kampf.mp4`.
 
