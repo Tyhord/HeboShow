@@ -26,7 +26,7 @@ Zwei getrennte Programme im LAN, kein Docker, kein Internet:
 | `hebocon/tracking.py` | Zwei Roboter-Plätze aus der Leerbild-Differenz, Aussehens-Abgleich, EdgeTAM-Schiedsrichter |
 | `hebocon/game.py` | HP-Regeln, reine Logik ohne Bild |
 | `hebocon/server.py` | Starlette: Anmeldung, Rechte, REST-Aktionen, WebSocket, hochgeladene Dateien in `data/media/` |
-| `hebocon/memes.py` | Kommando: Green-Screen-Videos aus einem ZIP freistellen (VP9 mit Alpha) und ins Soundboard legen |
+| `hebocon/memes.py` | Green Screen erkennen und freistellen (VP9 mit Alpha): als Kommando für ein ZIP und im Hintergrund für Uploads |
 
 ## Bausteine Client
 
@@ -49,6 +49,7 @@ Zwei getrennte Programme im LAN, kein Docker, kein Internet:
 | Hintergrund-Aktionen | Scan, Segmentierung bei der Registrierung |
 | `discovery` | beantwortet UDP-Suchanfragen aus dem Netz des gewählten Adapters |
 | `netwatch` | prüft alle 5 s, ob der gewählte Adapter noch verbunden ist, und warnt in der Konsole |
+| `keyer` | stellt hochgeladene Green-Screen-Videos nacheinander frei, jedes in einem eigenen Prozess mit niedriger Priorität |
 | Hauptthread | uvicorn, Aktionen laufen per `asyncio.to_thread` |
 
 Gemeinsamer Zustand ist durch eine Sperre in `app.py` geschützt, die Lobby durch eine

@@ -48,8 +48,8 @@ fehlendem Recht 403 und `{"ok": false, "message"}`.
 
 | Pfad | Inhalt |
 | --- | --- |
-| `POST /media` | Datei hochladen: roher Körper, `Content-Type` der Datei, Kopf `X-Name` (URL-kodiert), Kopf `X-Board: 1` macht daraus eine Soundboard-Kachel. Antwort `{"ok", "url", "name", "mime"}`, höchstens 100 MB |
-| `GET /media` | Soundboard-Kacheln, neueste zuerst: `[{"url", "name", "mime", "cutout"}]`; `cutout: true` heißt freigestelltes Video mit Alphakanal, die Bühne zeigt es ohne Rahmen |
+| `POST /media` | Datei hochladen: roher Körper, `Content-Type` der Datei, Kopf `X-Name` (URL-kodiert), Kopf `X-Board: 1` macht daraus eine Soundboard-Kachel. Antwort `{"ok", "url", "name", "mime", "cutout", "processing"}`, höchstens 100 MB. Ist dieselbe Datei schon auf dem Board, kommt diese Kachel mit `"duplicate": true` und `message` zurück |
+| `GET /media` | Soundboard-Kacheln, neueste zuerst: `[{"url", "name", "mime", "cutout", "processing"}]`; `cutout: true` heißt freigestelltes Video mit Alphakanal, die Bühne zeigt es ohne Rahmen. `processing: true` heißt, das Grün wird gerade entfernt; danach hat die Kachel eine neue `url` |
 | `GET /media/<key>` | Hochgeladene Datei abrufen |
 | `PATCH /media/<key>` | Kachel umbenennen, Körper `{"name"}` |
 | `DELETE /media/<key>` | Kachel und Datei löschen |
@@ -118,6 +118,7 @@ Alle Koordinaten in **Pixeln des Originalbildes** (`frame.w` × `frame.h`).
 | `memes` | Liste `{id, media, paused, played, x, y, tilt}`. `played` ist die gespielte Zeit in s, `x`/`y` (0–1) der Anteil am freien Platz, damit das Meme auf jeder Bühnengröße ganz sichtbar bleibt. Eine neu geöffnete Bühne steigt bei `played` ein. |
 | `battle` | Zähler, steigt bei jedem Start. Trennt Ereignisse verschiedener Kämpfe. |
 | `message` | Klartext für die Bedienung |
+| `board_rev` | Zähler; ändert er sich, lädt die Bedienung `GET /media` neu (Upload, Umbenennen, Löschen, Freistellen fertig) |
 | `busy` | Name der laufenden Hintergrundarbeit oder `null` |
 | `camera` | `source`, `error` |
 | `tracking` | `fps` (fertige Tracking-Bilder pro Sekunde, `0` ohne Tracking), `latency_ms` (Aufnahme bis Ergebnis), `error` (letzter Tracking-Fehler oder `null`) |

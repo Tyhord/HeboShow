@@ -85,6 +85,14 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
   und Ton als Kachel „Meme 001“ … abgelegt. Schon importierte Videos überspringt ein zweiter
   Lauf. Auf der Bühne erscheinen sie ohne Rahmen, Schatten oder Hintergrund und laufen bis
   zu ihrem Ende, auch über 30 s.
+* **Hochgeladene Videos mit Green Screen** erkennt der Server selbst (kräftiges Grün am
+  Bildrand) und stellt sie im Hintergrund genauso frei. Bis dahin zeigt die Kachel
+  „⏳ Green Screen wird entfernt …“ und ist gesperrt; danach ist sie auf allen Bedienungen
+  ohne Neustart spielbereit. Das Ergebnis bleibt gespeichert und wird nie erneut
+  berechnet; wird der Server mittendrin beendet, macht er beim nächsten Start weiter.
+  Klappt das Freistellen nicht, bleibt das Original als normale Kachel. Lädt jemand
+  dieselbe Datei noch einmal hoch, meldet die Bedienung das und legt keine zweite Kachel an.
+* Hochladen, Umbenennen und Löschen erscheinen sofort auf allen offenen Bedienungen.
 
 **Rechts: Einstellungen** mit Reitern „📷 Kamera · 🔳 Spielfeld · 🤖 Roboter · ⚖ Balancing“.
 Der Reiter folgt dem Ablauf (keine Kamera → Kamera, Kalibrierung → Spielfeld, Registrierung

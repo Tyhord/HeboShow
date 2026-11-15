@@ -31,6 +31,11 @@ Alphakanal. Live-Keying im Browser würde bei jedem Abspielen Rechenzeit neben d
 kosten und auf jeder Bühne einzeln laufen. Zuschnitt auf den Inhalt und höchstens 720 px
 halten Dateien und Dekodierung klein. Grenze: Echtes Grün direkt an der Motivkante kann
 mit verschwinden; Grün im Motiv bleibt.
+Uploads stellt der Server selbst frei, in einem eigenen Prozess mit niedriger Priorität,
+damit das Kodieren dem Tracking weder GIL noch CPU wegnimmt. Grün erkennt er nur, wenn der
+Bildrand überwiegend kräftig grün ist; Videos mit wenig Grün am Rand bleiben unverändert.
+Doppelte Uploads erkennt er am SHA-256 der Datei; die per Kommando importierten Memes
+haben keinen solchen Fingerabdruck und werden beim Hochladen nicht als doppelt erkannt.
 
 **Ein Server, beliebig viele Clients im LAN.**
 Kamera, Tracking und Regeln laufen genau einmal auf dem Rechner an der Kamera; nur so sehen

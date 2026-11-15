@@ -5,8 +5,11 @@ Die Seiten liefert der Client selbst aus; hier gibt es nur Daten, und jede Aktio
 """
 
 import asyncio
+import hashlib
+import io
 import json
 import logging
+import threading
 import uuid
 from pathlib import Path
 from urllib.parse import unquote
@@ -21,6 +24,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from .app import App, UserError
 from .lobby import ROLE_LABEL, Lobby, LobbyError
+from .memes import Keyer, green_key
 
 log = logging.getLogger(__name__)
 MAX_MEDIA = 100 * 1024 * 1024
@@ -33,43 +37,84 @@ class MediaStore:
     def __init__(self, folder: Path):
         self.folder = folder
         self.folder.mkdir(parents=True, exist_ok=True)
+        # Upload-Threads und das Freistellen im Hintergrund ändern die Liste gleichzeitig.
+        self.lock = threading.RLock()
         self.index = folder / "board.json"
         self.board: list[dict] = json.loads(self.index.read_text("utf-8")) if self.index.exists() else []
         self.board = [b for b in self.board if (folder / b["key"]).is_file()]
         self.mimes = {b["key"]: b["mime"] for b in self.board}
         # Steckbriefe überleben keinen Neustart, ihre Bilder wären sonst ewiger Ballast.
+        # Halbfertige Freistellungen fallen ebenfalls weg; sie werden neu gestartet.
         for path in folder.iterdir():
             if path != self.index and path.name not in self.mimes:
                 path.unlink(missing_ok=True)
 
     def add(self, body: bytes, mime: str, name: str, board: bool, cutout: bool = False,
-            source: str | None = None) -> dict:
+            source: str | None = None, sha: str | None = None, processing: bool = False) -> dict:
         key = uuid.uuid4().hex
         (self.folder / key).write_bytes(body)
-        self.mimes[key] = mime
         entry = {"key": key, "name": name, "mime": mime}
-        # Freigestellte Memes zeigt die Bühne ohne Rahmen; source verhindert doppelten Import.
+        # Freigestellte Memes zeigt die Bühne ohne Rahmen; source und sha verhindern doppelte Arbeit.
         if cutout:
             entry["cutout"] = True
         if source:
             entry["source"] = source
-        if board:
-            self.board.insert(0, entry)
-            self._save()
+        if sha:
+            entry["sha"] = sha
+        if processing:
+            entry["processing"] = True
+        with self.lock:
+            self.mimes[key] = mime
+            if board:
+                self.board.insert(0, entry)
+                self._save()
         return entry
 
+    def find(self, sha: str) -> dict | None:
+        return next((b for b in self.board if b.get("sha") == sha), None)
+
+    def name(self, key: str) -> str | None:
+        return next((b["name"] for b in self.board if b["key"] == key), None)
+
+    def pending(self) -> list[dict]:
+        return [b for b in self.board if b.get("processing")]
+
+    def finish(self, key: str, result: Path | None) -> None:
+        """Freistellung fertig: neue Datei unter neuem Schlüssel, damit kein Browser das Original cacht."""
+        with self.lock:
+            entry = next((b for b in self.board if b["key"] == key), None)
+            if entry is None:
+                # Während der Arbeit gelöscht.
+                if result:
+                    result.unlink(missing_ok=True)
+                return
+            entry.pop("processing", None)
+            if result:
+                new = uuid.uuid4().hex
+                result.replace(self.folder / new)
+                self.mimes.pop(key, None)
+                self.mimes[new] = "video/webm"
+                entry.update(key=new, mime="video/webm", cutout=True)
+                self._unlink(key)
+            self._save()
+
     def rename(self, key: str, name: str) -> bool:
-        for entry in self.board:
-            if entry["key"] == key:
-                entry["name"] = name
-                self._save()
-                return True
+        with self.lock:
+            for entry in self.board:
+                if entry["key"] == key:
+                    entry["name"] = name
+                    self._save()
+                    return True
         return False
 
     def remove(self, key: str) -> None:
-        self.board = [b for b in self.board if b["key"] != key]
-        self.mimes.pop(key, None)
-        self._save()
+        with self.lock:
+            self.board = [b for b in self.board if b["key"] != key]
+            self.mimes.pop(key, None)
+            self._save()
+        self._unlink(key)
+
+    def _unlink(self, key: str) -> None:
         try:
             (self.folder / key).unlink(missing_ok=True)
         except PermissionError:
@@ -86,9 +131,15 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
     store = MediaStore(media_dir)
     lobby = lobby or app.lobby or Lobby(None, "admin")
 
+    def board_changed() -> None:
+        # Alle Bedienungen laden das Soundboard neu, sobald sich diese Zahl im Zustand ändert.
+        app.board_rev += 1
+
+    keyer = Keyer(store, board_changed)
+
     def public(entry: dict) -> dict:
         return {"url": f"/media/{entry['key']}", "name": entry["name"], "mime": entry["mime"],
-                "cutout": entry.get("cutout", False)}
+                "cutout": entry.get("cutout", False), "processing": entry.get("processing", False)}
 
     def who(request: Request) -> tuple[str, dict | None]:
         auth = request.headers.get("authorization", "")
@@ -168,7 +219,19 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
         mime = request.headers.get("content-type", "application/octet-stream")
         name = unquote(request.headers.get("x-name", ""))
         board = request.headers.get("x-board") == "1"
-        entry = await asyncio.to_thread(store.add, body, mime, name, board)
+        if not board:
+            entry = await asyncio.to_thread(store.add, body, mime, name, False)
+            return JSONResponse({"ok": True, **public(entry)})
+        sha = hashlib.sha256(body).hexdigest()
+        if (known := store.find(sha)) is not None:
+            message = f"„{known['name']}“ liegt schon im Soundboard."
+            return JSONResponse({"ok": True, "duplicate": True, "message": message, **public(known)})
+        green = mime.startswith("video/") and await asyncio.to_thread(green_key, io.BytesIO(body)) is not None
+        entry = await asyncio.to_thread(store.add, body, mime, name, True, sha=sha, processing=green)
+        log.info("Soundboard: „%s“ hochgeladen%s.", name, ", Green Screen erkannt" if green else "")
+        if green:
+            keyer.submit(entry["key"])
+        board_changed()
         return JSONResponse({"ok": True, **public(entry)})
 
     async def board(_: Request):
@@ -187,11 +250,13 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
         key = request.path_params["key"]
         if request.method == "DELETE":
             store.remove(key)
+            board_changed()
             return JSONResponse({"ok": True})
         name = str((await request.json()).get("name") or "").strip()
         if not name or not store.rename(key, name):
             message = "Kachel nicht gefunden oder Name leer."
             return JSONResponse({"ok": False, "message": message}, status_code=400)
+        board_changed()
         return JSONResponse({"ok": True})
 
     async def stream(ws: WebSocket):
