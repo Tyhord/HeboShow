@@ -25,8 +25,10 @@ Zwei getrennte Programme im LAN, kein Docker, kein Internet:
 | `hebocon/segmenter.py` | EdgeTAM (optional): Maske bei der Registrierung, Video-Gedächtnis für den Schiedsrichter |
 | `hebocon/tracking.py` | Zwei Roboter-Plätze aus der Leerbild-Differenz, Aussehens-Abgleich, EdgeTAM-Schiedsrichter |
 | `hebocon/game.py` | HP-Regeln, reine Logik ohne Bild |
-| `hebocon/server.py` | Starlette: Anmeldung, Rechte, REST-Aktionen, WebSocket, hochgeladene Dateien in `data/media/` |
-| `hebocon/memes.py` | Green Screen erkennen und freistellen (VP9 mit Alpha): als Kommando für ein ZIP und im Hintergrund für Uploads |
+| `hebocon/server.py` | Starlette: Anmeldung, Rechte, REST-Aktionen, WebSocket, Steckbriefbilder in `data/media/`, Meme-Dateien aus `memes/` |
+| `hebocon/library.py` | Soundboard: Ordner `memes/` überwachen, Index `data/soundboard.json`, Upload, Freistellen im Hintergrund |
+| `hebocon/memes.py` | Green Screen erkennen und entfernen (VP9 mit Alpha), Ergebnis prüfen, Original ersetzen |
+| `greenscreen.py` | Kommando: alle Videos in `memes/` freistellen |
 
 ## Bausteine Client
 
@@ -49,7 +51,8 @@ Zwei getrennte Programme im LAN, kein Docker, kein Internet:
 | Hintergrund-Aktionen | Scan, Segmentierung bei der Registrierung |
 | `discovery` | beantwortet UDP-Suchanfragen aus dem Netz des gewählten Adapters |
 | `netwatch` | prüft alle 5 s, ob der gewählte Adapter noch verbunden ist, und warnt in der Konsole |
-| `keyer` | stellt hochgeladene Green-Screen-Videos nacheinander frei, jedes in einem eigenen Prozess mit niedriger Priorität |
+| `memes` | schaut alle 2 s in `memes/`, übernimmt neue und entfernt verschwundene Dateien |
+| `keyer` | arbeitet hochgeladene Videos mit „Remove green screen“ nacheinander ab, jeweils in einem eigenen Prozess mit niedriger Priorität, damit das Tracking nicht leidet |
 | Hauptthread | uvicorn, Aktionen laufen per `asyncio.to_thread` |
 
 Gemeinsamer Zustand ist durch eine Sperre in `app.py` geschützt, die Lobby durch eine

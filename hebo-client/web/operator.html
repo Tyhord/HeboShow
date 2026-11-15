@@ -70,6 +70,10 @@
     border-radius: 12px; background: #a65300; padding: 12px 15px; cursor: pointer; }
   .sound-actions label:focus-within { outline: 3px solid #ffd087; outline-offset: 3px; }
   .sound-actions input { width: 0; height: 0; opacity: 0; position: absolute; }
+  .sound-actions .key-toggle { background: none; border-color: #65758d; font-weight: 600; }
+  .sound-actions .key-toggle input { position: static; width: 19px; height: 19px; opacity: 1; margin: 0; accent-color: #3fb950; }
+  .board-tile.is-processing { border: 2px dashed #58a6ff; cursor: progress; opacity: .8; }
+  .board-tile.is-processing small { color: #a5d6ff; font-weight: 700; }
   .board-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 118px; gap: 12px; }
   /* Spaltenzahl nach der echten Breite des Soundboards statt des Fensters: Vollbild 3, halber Bildschirm 2. */
   .media-section { container: board / inline-size; }
@@ -251,13 +255,14 @@
       <h3 id="mediaTitle">🔊 Memes &amp; Sounds</h3>
       <div class="sound-actions">
         <label title="Medien hinzufügen: Audio, Bild oder Video">＋ <input id="files" type="file" accept="audio/*,image/*,video/*,.mp4,.m4v,.webm,.mov,.mkv,.mp3,.wav,.ogg,.m4a,.aac,.flac,.opus,.gif" multiple aria-label="Medien hinzufügen: Audio-, Bild- oder Videodateien auswählen"></label>
+        <label class="key-toggle" title="Hochgeladene Videos mit grünem Hintergrund auf dem Server freistellen. Das Meme erscheint danach ohne Hintergrund in der Kampfansicht."><input id="greenKey" type="checkbox"> Remove green screen</label>
         <button id="stopMedia" type="button" class="icon" title="Alle Medien stoppen">⏹</button>
       </div>
       <div id="board" class="board-grid">
         <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erster Sound</strong><small>Audio hochladen</small></div>
         <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erstes Meme</strong><small>Bild oder Video hochladen</small></div>
       </div>
-      <div class="board-footer">Hochgeladene Dateien bleiben auch nach einem Neustart erhalten. Memes erscheinen an zufälligen Stellen der Kampfansicht; ein zweiter Klick pausiert, ein dritter setzt fort. ✎ benennt eine Kachel um, 🗑 löscht sie.</div>
+      <div class="board-footer">Alle Dateien im Ordner <code>memes/</code> des Servers erscheinen hier von selbst und bleiben nach einem Neustart erhalten. Memes erscheinen an zufälligen Stellen der Kampfansicht; ein zweiter Klick pausiert, ein dritter setzt fort. ✎ benennt eine Kachel um, 🗑 löscht sie.</div>
     </section>
   </section>
 
@@ -492,12 +497,15 @@ const MIME = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
 };
 
-async function upload(file, mime, board = false) {
+async function upload(file, mime, board = false, key = false) {
   try {
     const name = board ? file.name.replace(/\.[^.]+$/, "") : file.name;
     const r = await api("/media", {
       method: "POST", body: file,
-      headers: { "Content-Type": mime, "X-Name": encodeURIComponent(name), "X-Board": board ? "1" : "0" },
+      headers: {
+        "Content-Type": mime, "X-Name": encodeURIComponent(name), "X-Board": board ? "1" : "0",
+        "X-Key": key ? "1" : "0",
+      },
     });
     return await r.json();
   } catch {
@@ -584,35 +592,30 @@ async function addMedia(file) {
     byId("message").textContent = `${file.name}: Format nicht unterstützt. Bitte MP4, WebM, MP3, WAV, GIF, PNG oder JPG wählen.`;
     return;
   }
-  const res = await upload(file, mime, true);
-  if (!res.ok || res.duplicate) { byId("message").textContent = res.message; return; }
-  if (res.processing) byId("message").textContent = `${file.name}: Green Screen erkannt, wird im Hintergrund entfernt. Die Kachel ist danach spielbereit.`;
+  const key = byId("greenKey").checked && mime.startsWith("video/");
+  byId("message").textContent = `${file.name} wird hochgeladen …`;
+  const res = await upload(file, mime, true, key);
+  if (!res.ok) { byId("message").textContent = res.message; return; }
+  byId("message").textContent = key ? `${file.name}: Green Screen wird auf dem Server entfernt …`
+    : `${file.name} liegt im Soundboard.`;
   await loadBoard();
 }
 
 const tiles = new Map();
-let boardRev = null;
+const wraps = new Map();
 const TILE_HINT = { playing: "⏸ Läuft – Klick pausiert", paused: "▶ Pausiert – Klick setzt fort" };
 
-function updateTiles(memes = []) {
+function updateTiles(memes = [], keying = {}) {
   const state = new Map(memes.map((m) => [m.media.url, m.paused ? "paused" : "playing"]));
   tiles.forEach((tile, url) => {
     const st = state.get(url);
+    const busy = tile.classList.contains("is-processing");
     tile.classList.toggle("is-playing", st === "playing");
     tile.classList.toggle("is-paused", st === "paused");
-    tile.querySelector("small").textContent = tile.disabled ? "Green Screen wird entfernt …"
+    tile.querySelector("small").textContent = busy
+      ? `Green Screen wird entfernt … ${Math.round(100 * (keying[url] || 0))} %`
       : TILE_HINT[st] || "In Kampfansicht abspielen";
   });
-}
-
-function setTile(tile, media) {
-  const label = tile.querySelector("strong");
-  label.textContent = media.name;
-  label.title = media.name;
-  // Bis das Freistellen fertig ist, gäbe es nur das grüne Original zu sehen.
-  tile.disabled = media.processing;
-  tile.querySelector(".tile-symbol").textContent = media.processing ? "⏳" : ICON[media.mime.split("/")[0]] || "▶";
-  return tile.parentElement;
 }
 
 function addTile(media) {
@@ -620,7 +623,10 @@ function addTile(media) {
   tile.type = "button";
   tile.className = "board-tile";
   tile.innerHTML = '<span class="tile-symbol"></span><strong></strong><small>In Kampfansicht abspielen</small>';
+  tile.querySelector(".tile-symbol").textContent = ICON[media.mime.split("/")[0]] || "▶";
   const label = tile.querySelector("strong");
+  label.textContent = media.name;
+  label.title = media.name;
   // Ein Klick startet, der nächste pausiert, der dritte setzt fort; der Server entscheidet anhand der URL.
   tile.onclick = () => run("cue", { kind: "media", media: { ...media, name: label.textContent } });
   tiles.set(media.url, tile);
@@ -641,29 +647,47 @@ function addTile(media) {
   remove.textContent = "🗑";
   remove.onclick = async () => {
     if (!confirm(`„${label.textContent}“ endgültig löschen?`)) return;
-    await api(media.url, { method: "DELETE" });
-    tiles.delete(media.url);
-    wrap.remove();
+    const res = await (await api(media.url, { method: "DELETE" })).json();
+    if (!res.ok) byId("message").textContent = res.message;
+    await loadBoard();
   };
   wrap.append(tile, rename, remove);
-  document.querySelectorAll("#board .is-empty").forEach((el) => el.remove());
-  return setTile(tile, media);
+  wraps.set(media.url, wrap);
+  return wrap;
 }
 
+let boardRev = null;
+let boardLoad = 0;
+const EMPTY_TILES = [...byId("board").children];
+
+// Abgleich statt Neuaufbau: Kacheln mit offenem Umbenennen-Feld und Abspielzustand bleiben erhalten.
 async function loadBoard() {
+  const mine = ++boardLoad;
+  let list;
   try {
-    const list = await (await api("/media")).json();
-    const urls = new Set(list.map((m) => m.url));
-    tiles.forEach((_, url) => { if (!urls.has(url)) tiles.delete(url); });
-    // Vorhandene Kacheln wiederverwenden, damit ein offenes Umbenennen nicht verloren geht.
-    const wraps = list.map((m) => (tiles.has(m.url) ? setTile(tiles.get(m.url), m) : addTile(m)));
-    if (wraps.length) byId("board").replaceChildren(...wraps);
-    else byId("board").querySelectorAll(".tile-wrap").forEach((el) => el.remove());
+    list = await (await api("/media")).json();
   } catch {
     byId("message").textContent = "Soundboard konnte nicht geladen werden. Seite neu laden.";
+    return;
   }
+  if (mine !== boardLoad) return;
+  const seen = new Set(list.map((m) => m.url));
+  for (const url of [...wraps.keys()]) {
+    if (!seen.has(url)) { wraps.delete(url); tiles.delete(url); }
+  }
+  const items = list.map((m) => {
+    const wrap = wraps.get(m.url) || addTile(m);
+    const tile = tiles.get(m.url);
+    const label = tile.querySelector("strong");
+    if (!wrap.querySelector("input")) { label.textContent = m.name; label.title = m.name; }
+    tile.classList.toggle("is-processing", Boolean(m.processing));
+    tile.disabled = Boolean(m.processing);
+    wrap.querySelectorAll(".tile-rename").forEach((b) => { b.disabled = Boolean(m.processing); });
+    return wrap;
+  });
+  byId("board").replaceChildren(...(items.length ? items : EMPTY_TILES));
+  updateTiles(state?.memes, state?.board?.keying);
 }
-loadBoard();
 
 function renameTile(wrap, label, url) {
   if (wrap.querySelector("input")) return;
@@ -799,12 +823,9 @@ function ui(s) {
       : `Laser-Ulti von ${name} lädt: ${Math.round(100 * u.charge)} %`);
   }
   byId("obstacle").disabled = byId("powerup").disabled = !fighting;
-  updateTiles(s.memes);
-  // Andere Bedienungen oder das Freistellen im Hintergrund haben das Soundboard geändert.
-  if (s.board_rev !== boardRev) {
-    if (boardRev !== null) loadBoard();
-    boardRev = s.board_rev;
-  }
+  updateTiles(s.memes, s.board?.keying);
+  // Neue, ersetzte oder freigestellte Dateien im Meme-Ordner melden sich über den Zähler.
+  if (s.board && s.board.rev !== boardRev) { boardRev = s.board.rev; loadBoard(); }
   byId("shrink").disabled = !fighting || Boolean(s.zone);
   const b = s.balancing;
   tip(byId("shrink"), s.zone ? "Arena schrumpft gerade"

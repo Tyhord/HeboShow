@@ -30,7 +30,7 @@ hebo-server/
     app.py          Ablauf, Aktionen, Zustand, Paket
     lobby.py        Rollen, Tokens, Spielerplätze, lobby.json
     discovery.py    UDP-Antwort für die Server-Suche
-    server.py       Starlette: /lobby, /api, /ws, /media
+    server.py       Starlette: /lobby, /api, /ws, /media, /memes
   tests/            pytest, synthetisch, ohne Modell und Kamera
   data/             Laufzeitdaten (Ecken, Leerbild, Medien, Balancing, Lobby), nicht im Git
 hebo-client/

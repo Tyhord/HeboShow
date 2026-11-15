@@ -33,3 +33,6 @@ dist/
 
 # Client-Einstellungen pro Gerät (letzter Server, Anmeldungen)
 hebo-client/client.json
+
+# Halbfertige Dateien beim Freistellen und Hochladen
+hebo-server/memes/.*

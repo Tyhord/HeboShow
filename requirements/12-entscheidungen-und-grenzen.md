@@ -9,8 +9,9 @@ Medien und VS-Bildschirm kommen als `memes`/`vs`/`profiles` im Zustand an, nicht
 zu Fenster. Die App führt die Liste laufender Memes samt Pause, gespielter Zeit und
 Position; jede Bühne gleicht sich daran ab, auch eine später geöffnete. So klappt es gleich, ob Bühne und Bedienung in pywebview oder in getrennten
 Browsern laufen. Die K.O.-Knöpfe gehen dagegen über die Spielregeln (`ko`), damit HP,
-Sieger und Kampfzeit stimmen. Soundboard-Dateien liegen in `data/media/` und überleben einen
-Neustart, damit Memes nicht vor jeder Veranstaltung neu hochgeladen werden müssen. Steckbriefe
+Sieger und Kampfzeit stimmen. Soundboard-Dateien liegen im Ordner `memes/` und überleben einen
+Neustart, damit Memes nicht vor jeder Veranstaltung neu hochgeladen werden müssen. Der Ordner
+ist die Quelle: Wer Dateien hineinlegt, braucht keinen Upload. Steckbriefe
 sind nicht dauerhaft; ihre Bilder löscht die App deshalb beim nächsten Start.
 
 **Laser-Ulti lädt durch Schaden und ist ausweichbar.**
@@ -27,15 +28,12 @@ Bühnenfenster spielt den Ton, auch das der Moderation und der Spieler.
 
 **Green-Screen-Memes werden vorab freigestellt, nicht live.**
 `hebocon.memes` rechnet das Grün einmalig heraus und speichert WebM (VP9) mit echtem
-Alphakanal. Live-Keying im Browser würde bei jedem Abspielen Rechenzeit neben dem Tracking
-kosten und auf jeder Bühne einzeln laufen. Zuschnitt auf den Inhalt und höchstens 720 px
-halten Dateien und Dekodierung klein. Grenze: Echtes Grün direkt an der Motivkante kann
-mit verschwinden; Grün im Motiv bleibt.
-Uploads stellt der Server selbst frei, in einem eigenen Prozess mit niedriger Priorität,
-damit das Kodieren dem Tracking weder GIL noch CPU wegnimmt. Grün erkennt er nur, wenn der
-Bildrand überwiegend kräftig grün ist; Videos mit wenig Grün am Rand bleiben unverändert.
-Doppelte Uploads erkennt er am SHA-256 der Datei; die per Kommando importierten Memes
-haben keinen solchen Fingerabdruck und werden beim Hochladen nicht als doppelt erkannt.
+Alphakanal; nur das kann der Browser transparent abspielen. Live-Keying im Browser würde bei
+jedem Abspielen Rechenzeit neben dem Tracking kosten und auf jeder Bühne einzeln laufen. Der
+Zuschnitt auf den Inhalt hält Dateien klein. Das Original wird ersetzt, damit im Ordner keine
+Doppel liegen, aber erst nach geprüftem Ergebnis. Ein Video gilt als Green Screen, wenn der
+Bildrand überwiegend kräftig grün ist; sonst bleibt es unverändert. Grenze: Echtes Grün
+direkt an der Motivkante kann mit verschwinden; Grün im Motiv bleibt.
 
 **Ein Server, beliebig viele Clients im LAN.**
 Kamera, Tracking und Regeln laufen genau einmal auf dem Rechner an der Kamera; nur so sehen

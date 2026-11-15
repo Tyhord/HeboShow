@@ -5,11 +5,7 @@ Die Seiten liefert der Client selbst aus; hier gibt es nur Daten, und jede Aktio
 """
 
 import asyncio
-import hashlib
-import io
-import json
 import logging
-import threading
 import uuid
 from pathlib import Path
 from urllib.parse import unquote
@@ -23,124 +19,46 @@ from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from .app import App, UserError
+from .library import MemeLibrary
 from .lobby import ROLE_LABEL, Lobby, LobbyError
-from .memes import Keyer, green_key
 
 log = logging.getLogger(__name__)
 MAX_MEDIA = 100 * 1024 * 1024
-MEDIA_DIR = Path(__file__).resolve().parent.parent / "data" / "media"
+ROOT = Path(__file__).resolve().parent.parent
+MEDIA_DIR = ROOT / "data" / "media"
+MEMES_DIR = ROOT / "memes"
 
 
 class MediaStore:
-    """Hochgeladene Dateien auf der Platte; board.json merkt sich die Soundboard-Kacheln."""
+    """Steckbriefbilder auf der Platte; sie überleben keinen Neustart, sonst wären sie ewiger Ballast."""
 
     def __init__(self, folder: Path):
         self.folder = folder
         self.folder.mkdir(parents=True, exist_ok=True)
-        # Upload-Threads und das Freistellen im Hintergrund ändern die Liste gleichzeitig.
-        self.lock = threading.RLock()
-        self.index = folder / "board.json"
-        self.board: list[dict] = json.loads(self.index.read_text("utf-8")) if self.index.exists() else []
-        self.board = [b for b in self.board if (folder / b["key"]).is_file()]
-        self.mimes = {b["key"]: b["mime"] for b in self.board}
-        # Steckbriefe überleben keinen Neustart, ihre Bilder wären sonst ewiger Ballast.
-        # Halbfertige Freistellungen fallen ebenfalls weg; sie werden neu gestartet.
+        self.mimes: dict[str, str] = {}
         for path in folder.iterdir():
-            if path != self.index and path.name not in self.mimes:
-                path.unlink(missing_ok=True)
+            path.unlink(missing_ok=True)
 
-    def add(self, body: bytes, mime: str, name: str, board: bool, cutout: bool = False,
-            source: str | None = None, sha: str | None = None, processing: bool = False) -> dict:
+    def add(self, body: bytes, mime: str) -> str:
         key = uuid.uuid4().hex
         (self.folder / key).write_bytes(body)
-        entry = {"key": key, "name": name, "mime": mime}
-        # Freigestellte Memes zeigt die Bühne ohne Rahmen; source und sha verhindern doppelte Arbeit.
-        if cutout:
-            entry["cutout"] = True
-        if source:
-            entry["source"] = source
-        if sha:
-            entry["sha"] = sha
-        if processing:
-            entry["processing"] = True
-        with self.lock:
-            self.mimes[key] = mime
-            if board:
-                self.board.insert(0, entry)
-                self._save()
-        return entry
-
-    def find(self, sha: str) -> dict | None:
-        return next((b for b in self.board if b.get("sha") == sha), None)
-
-    def name(self, key: str) -> str | None:
-        return next((b["name"] for b in self.board if b["key"] == key), None)
-
-    def pending(self) -> list[dict]:
-        return [b for b in self.board if b.get("processing")]
-
-    def finish(self, key: str, result: Path | None) -> None:
-        """Freistellung fertig: neue Datei unter neuem Schlüssel, damit kein Browser das Original cacht."""
-        with self.lock:
-            entry = next((b for b in self.board if b["key"] == key), None)
-            if entry is None:
-                # Während der Arbeit gelöscht.
-                if result:
-                    result.unlink(missing_ok=True)
-                return
-            entry.pop("processing", None)
-            if result:
-                new = uuid.uuid4().hex
-                result.replace(self.folder / new)
-                self.mimes.pop(key, None)
-                self.mimes[new] = "video/webm"
-                entry.update(key=new, mime="video/webm", cutout=True)
-                self._unlink(key)
-            self._save()
-
-    def rename(self, key: str, name: str) -> bool:
-        with self.lock:
-            for entry in self.board:
-                if entry["key"] == key:
-                    entry["name"] = name
-                    self._save()
-                    return True
-        return False
-
-    def remove(self, key: str) -> None:
-        with self.lock:
-            self.board = [b for b in self.board if b["key"] != key]
-            self.mimes.pop(key, None)
-            self._save()
-        self._unlink(key)
-
-    def _unlink(self, key: str) -> None:
-        try:
-            (self.folder / key).unlink(missing_ok=True)
-        except PermissionError:
-            # Windows sperrt Dateien, die gerade abgespielt werden; der nächste Start räumt sie weg.
-            pass
-
-    def _save(self) -> None:
-        tmp = self.index.with_suffix(".tmp")
-        tmp.write_text(json.dumps(self.board, ensure_ascii=False, indent=1), "utf-8")
-        tmp.replace(self.index)
+        self.mimes[key] = mime
+        return key
 
 
-def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = None) -> Starlette:
+def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = None,
+                  memes_dir: Path = MEMES_DIR) -> Starlette:
+    def changed(message: str | None) -> None:
+        app.board_rev += 1
+        if message:
+            app.message = message
+
+    # Zuerst die Bibliothek: sie übernimmt einmalig das alte Soundboard aus media_dir.
+    library = MemeLibrary(memes_dir, media_dir.parent / "soundboard.json", changed, legacy=media_dir)
+    # Dasselbe Objekt, damit der Zustand den Fortschritt ohne Umweg sieht.
+    app.keying = library.keying
     store = MediaStore(media_dir)
     lobby = lobby or app.lobby or Lobby(None, "admin")
-
-    def board_changed() -> None:
-        # Alle Bedienungen laden das Soundboard neu, sobald sich diese Zahl im Zustand ändert.
-        app.board_rev += 1
-
-    keyer = Keyer(store, board_changed)
-
-    def public(entry: dict) -> dict:
-        return {"url": f"/media/{entry['key']}", "name": entry["name"], "mime": entry["mime"],
-                "cutout": entry.get("cutout", False), "processing": entry.get("processing", False)}
-
     def who(request: Request) -> tuple[str, dict | None]:
         auth = request.headers.get("authorization", "")
         token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
@@ -218,24 +136,14 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
             return JSONResponse({"ok": False, "message": message}, status_code=400)
         mime = request.headers.get("content-type", "application/octet-stream")
         name = unquote(request.headers.get("x-name", ""))
-        board = request.headers.get("x-board") == "1"
-        if not board:
-            entry = await asyncio.to_thread(store.add, body, mime, name, False)
-            return JSONResponse({"ok": True, **public(entry)})
-        sha = hashlib.sha256(body).hexdigest()
-        if (known := store.find(sha)) is not None:
-            message = f"„{known['name']}“ liegt schon im Soundboard."
-            return JSONResponse({"ok": True, "duplicate": True, "message": message, **public(known)})
-        green = mime.startswith("video/") and await asyncio.to_thread(green_key, io.BytesIO(body)) is not None
-        entry = await asyncio.to_thread(store.add, body, mime, name, True, sha=sha, processing=green)
-        log.info("Soundboard: „%s“ hochgeladen%s.", name, ", Green Screen erkannt" if green else "")
-        if green:
-            keyer.submit(entry["key"])
-        board_changed()
-        return JSONResponse({"ok": True, **public(entry)})
+        if request.headers.get("x-board") != "1":
+            key = await asyncio.to_thread(store.add, body, mime)
+            return JSONResponse({"ok": True, "url": f"/media/{key}", "name": name, "mime": mime})
+        entry = await asyncio.to_thread(library.add, body, mime, name, request.headers.get("x-key") == "1")
+        return JSONResponse({"ok": True, **library.public(entry)})
 
     async def board(_: Request):
-        return JSONResponse([public(b) for b in store.board])
+        return JSONResponse(library.board())
 
     async def download(request: Request):
         key = request.path_params["key"]
@@ -244,19 +152,25 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
             return Response(status_code=404)
         return FileResponse(store.folder / key, media_type=mime)
 
+    async def meme(request: Request):
+        found = library.path(request.path_params["file"])
+        if found is None or not found[0].is_file():
+            return Response(status_code=404)
+        return FileResponse(found[0], media_type=found[1])
+
     async def change(request: Request):
         if (refused := moderator(request)) is not None:
             return refused
-        key = request.path_params["key"]
+        file = request.path_params["file"]
         if request.method == "DELETE":
-            store.remove(key)
-            board_changed()
+            if not await asyncio.to_thread(library.remove, file):
+                message = "Meme nicht gefunden oder wird gerade freigestellt."
+                return JSONResponse({"ok": False, "message": message}, status_code=400)
             return JSONResponse({"ok": True})
         name = str((await request.json()).get("name") or "").strip()
-        if not name or not store.rename(key, name):
+        if not name or not library.rename(file, name):
             message = "Kachel nicht gefunden oder Name leer."
             return JSONResponse({"ok": False, "message": message}, status_code=400)
-        board_changed()
         return JSONResponse({"ok": True})
 
     async def stream(ws: WebSocket):
@@ -300,7 +214,8 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
         Route("/media", upload, methods=["POST"]),
         Route("/media", board, methods=["GET"]),
         Route("/media/{key}", download, methods=["GET"]),
-        Route("/media/{key}", change, methods=["PATCH", "DELETE"]),
+        Route("/memes/{file}", meme, methods=["GET"]),
+        Route("/memes/{file}", change, methods=["PATCH", "DELETE"]),
         WebSocketRoute("/ws", stream),
     ], middleware=[
         # Die Seiten kommen vom lokalen Webserver des Clients, also von einer anderen Herkunft.

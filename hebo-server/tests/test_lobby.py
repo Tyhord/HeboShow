@@ -86,7 +86,7 @@ def client(tmp_path):
     lobby = Lobby(tmp_path / "lobby.json", "admin")
     app = App(Settings(segment_enabled=False, intro_s=0, _env_file=None), lobby=lobby)
     app.camera = FakeCamera()
-    with TestClient(create_server(app, tmp_path / "media", lobby)) as c:
+    with TestClient(create_server(app, tmp_path / "media", lobby, tmp_path / "memes")) as c:
         c.app_state = app
         yield c
 

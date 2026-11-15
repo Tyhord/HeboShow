@@ -551,7 +551,12 @@ function seek(el, seconds) {
 
 function play(el) {
   // Browser blockieren Ton ohne vorherigen Klick auf der Seite; dann bleibt es eben still.
-  el.play().catch(() => { el.muted = true; el.play().catch(() => {}); });
+  // Ein AbortError heißt dagegen, dass inzwischen pausiert wurde – dann nicht stumm weiterspielen.
+  el.play().catch((e) => {
+    if (e.name !== "NotAllowedError") return;
+    el.muted = true;
+    el.play().catch(() => {});
+  });
 }
 
 function startMedia(m) {

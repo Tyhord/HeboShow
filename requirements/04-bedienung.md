@@ -52,7 +52,8 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
     für Schrumpfen).
   * Schalter „Lebensleisten & Timer in der Kampfansicht“: blendet Lebensleisten,
     Kampfzeit und Statuszeilen in der Kampfansicht aus, etwa für Ansagen.
-* **Memes & Sounds**: ＋ Medien hinzufügen, ⏹ Medien stoppen, darunter die Kacheln.
+* **Memes & Sounds**: ＋ Medien hinzufügen, Haken „Remove green screen“, ⏹ Medien stoppen,
+  darunter die Kacheln.
 * ⚔ öffnet ein kleines Fenster mit je einem Steckbrief pro Roboter (blau Roboter 1, rot
   Roboter 2): Bild (am besten PNG mit transparentem Hintergrund; ✕ entfernt es), Name, Team,
   Gewicht, Höhe und optional ein Slogan. Gewicht und Höhe sind freier Text („850 g“).
@@ -76,23 +77,29 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
   Videos und Ton spielen im App-Fenster mit Ton, ohne dass jemand in die Bühne klickt.
   Fehlt Windows der Dateityp, gilt die Endung (z. B. mkv, mov, m4a); andere Formate und zu
   große Dateien (über 100 MB) meldet die Bedienung.
-* Kacheln samt Dateien liegen auf dem Server in `data/media/` (Liste mit Namen in
-  `data/media/board.json`) und sind nach einem Neustart wieder da, auch umbenannte Namen.
-* **Green-Screen-Memes** kommen per Kommando ins Soundboard, bei beendetem Server, im Ordner
-  `hebo-server`: `.venv\Scripts\python -m hebocon.memes Green-Screen-Memes.zip`. Jedes Video im ZIP wird
-  freigestellt (Grün samt Kantenschimmer weg, Kante leicht eingezogen), auf den sichtbaren
-  Inhalt zugeschnitten, auf höchstens 720 px verkleinert und als WebM mit echtem Alphakanal
-  und Ton als Kachel „Meme 001“ … abgelegt. Schon importierte Videos überspringt ein zweiter
-  Lauf. Auf der Bühne erscheinen sie ohne Rahmen, Schatten oder Hintergrund und laufen bis
-  zu ihrem Ende, auch über 30 s.
-* **Hochgeladene Videos mit Green Screen** erkennt der Server selbst (kräftiges Grün am
-  Bildrand) und stellt sie im Hintergrund genauso frei. Bis dahin zeigt die Kachel
-  „⏳ Green Screen wird entfernt …“ und ist gesperrt; danach ist sie auf allen Bedienungen
-  ohne Neustart spielbereit. Das Ergebnis bleibt gespeichert und wird nie erneut
-  berechnet; wird der Server mittendrin beendet, macht er beim nächsten Start weiter.
-  Klappt das Freistellen nicht, bleibt das Original als normale Kachel. Lädt jemand
-  dieselbe Datei noch einmal hoch, meldet die Bedienung das und legt keine zweite Kachel an.
-* Hochladen, Umbenennen und Löschen erscheinen sofort auf allen offenen Bedienungen.
+* **Das Soundboard ist der Ordner `hebo-server/memes/`.** Jede Audio-, Bild- oder Videodatei
+  darin wird eine Kachel, beim Start und während der Server läuft (spätestens nach etwa 4 s,
+  sobald die Datei fertig kopiert ist); alle Bedienungen sehen neue Kacheln sofort. Hochgeladene
+  Dateien landen ebenfalls dort. Namen und Reihenfolge stehen in `data/soundboard.json` und
+  bleiben über Neustarts erhalten, auch umbenannte Namen. Neue Dateien stehen vorne. Wird
+  `X.mp4` durch `X.webm` ersetzt, behält die Kachel Namen und Platz. Löschen per 🗑 löscht die
+  Datei im Ordner; Dateien mit Punkt am Anfang werden ignoriert. Ein altes Soundboard aus
+  `data/media/board.json` übernimmt der Server beim ersten Start einmalig in den Ordner.
+* **Green Screen entfernen per Skript**, im Ordner `hebo-server`:
+  `.venv\Scripts\python greenscreen.py` (optional anderer Ordner und `--workers N`, Standard 3).
+  Jedes Video mit Green Screen wird freigestellt (Grün samt Kantenschimmer weg, Kante weich und
+  leicht eingezogen), auf den sichtbaren Inhalt zugeschnitten und als WebM (VP9, `yuva420p`) mit
+  echtem Alphakanal und Ton in Originalauflösung gespeichert. Das Original wird erst gelöscht,
+  wenn das WebM geprüft ist (Alphakanal, echte Transparenz, Bildanzahl, Ton). Schon
+  freigestellte Videos und Videos ohne Green Screen bleiben unverändert; jede Datei bekommt eine
+  Zeile `OK`, `SKIP` oder `FEHLER`. Das Skript darf laufen, während der Server läuft.
+* **Haken „Remove green screen“** beim Hochladen: Das Video wird hochgeladen, die Kachel
+  erscheint sofort mit „Green Screen wird entfernt … N %“ und ist bis zum Ende gesperrt.
+  Danach zeigt sie das freigestellte WebM. Ohne Green Screen oder bei einem Fehler bleibt das
+  Original als Kachel und die Bedienung meldet es. Ohne Haken wird die Datei unverändert
+  übernommen. Bricht der Server währenddessen ab, macht er beim nächsten Start weiter.
+* Freigestellte Memes erscheinen auf der Bühne ohne Rahmen, Schatten oder Hintergrund und
+  laufen bis zu ihrem Ende, auch über 30 s.
 
 **Rechts: Einstellungen** mit Reitern „📷 Kamera · 🔳 Spielfeld · 🤖 Roboter · ⚖ Balancing“.
 Der Reiter folgt dem Ablauf (keine Kamera → Kamera, Kalibrierung → Spielfeld, Registrierung

@@ -50,6 +50,8 @@ class App:
         self.cfg = cfg
         self.lobby = lobby
         self._message = ""
+        self.board_rev = 0
+        self.keying: dict[str, float] = {}
         # Werte aus .env/Code merken, damit „Standardwerte“ dorthin zurückführt.
         self.balancing_defaults = {k: getattr(cfg, k) for k in BALANCING}
         self.balancing_file = balancing_file
@@ -85,8 +87,6 @@ class App:
         # Laufende und pausierte Medien; der Server führt sie, damit alle Bühnen dasselbe zeigen.
         self.memes: list[dict] = []
         self._meme_ids = 0
-        # Zählt Änderungen am Soundboard, damit alle Bedienungen ihre Kacheln nachladen.
-        self.board_rev = 0
         self._meme_rng = random.Random()
         # Kampfzeit in Kamerazeit: Beginn nach dem Intro, Ende beim K.o.
         self.phase_until = 0.0
@@ -605,11 +605,12 @@ class App:
             "finished": bool(self.game and self.game.finished),
             "intro": left if self.phase == "intro" else None,
             "countdown": left if self.phase == "countdown" else None,
-            "memes": self._meme_state(t), "board_rev": self.board_rev, "elapsed": elapsed, "hud": self.hud,
-            "vs": vs, "names": self.names,
+            "memes": self._meme_state(t), "elapsed": elapsed, "hud": self.hud, "vs": vs, "names": self.names,
             "profiles": self.profiles, "shot": shot,
             "balancing": {k: getattr(self.cfg, k) for k in BALANCING},
             "lobby": self.lobby.public() if self.lobby else {"players": [], "online": {}},
+            # Zähler statt Liste: das Soundboard lädt /media nur neu, wenn sich der Ordner geändert hat.
+            "board": {"rev": self.board_rev, "keying": dict(self.keying)},
         }
 
     def _publish(self, image: np.ndarray, seq: int) -> None:
