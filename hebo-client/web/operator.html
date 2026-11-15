@@ -66,19 +66,33 @@
   @keyframes ulti-ready { to { box-shadow: 0 0 18px var(--c); filter: brightness(1.4); } }
   .sound-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; }
   .sound-actions button { min-height: 45px; }
-  .sound-actions label { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; border: 1px solid #f39200;
-    border-radius: 12px; background: #a65300; padding: 12px 15px; cursor: pointer; }
-  .sound-actions label:focus-within { outline: 3px solid #ffd087; outline-offset: 3px; }
-  .sound-actions input { width: 0; height: 0; opacity: 0; position: absolute; }
-  .sound-actions .key-toggle { background: none; border-color: #65758d; font-weight: 600; }
-  .sound-actions .key-toggle input { position: static; width: 19px; height: 19px; opacity: 1; margin: 0; accent-color: #3fb950; }
+  .sound-actions .upload-button { font-size: 15px; font-weight: 700; border: 1px solid #f39200; border-radius: 12px; background: #a65300; padding: 12px 18px; }
+  .sound-actions .upload-button:hover { background: #c46400; }
   .board-tile.is-processing { border: 2px dashed #58a6ff; cursor: progress; opacity: .8; }
   .board-tile.is-processing small { color: #a5d6ff; font-weight: 700; }
-  .board-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 118px; gap: 12px; }
+  .board-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 118px; gap: 12px; border-radius: 14px; }
   /* Spaltenzahl nach der echten Breite des Soundboards statt des Fensters: Vollbild 3, halber Bildschirm 2. */
   .media-section { container: board / inline-size; }
   @container board (min-width: 440px) { .board-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-  .media-section .board-grid { flex: 0 1 auto; min-height: 130px; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+  .board-cats { flex: 0 1 auto; min-height: 130px; overflow-y: auto; overscroll-behavior: contain; padding: 2px 4px 2px 2px;
+    display: flex; flex-direction: column; gap: 16px; }
+  .cat-add { display: flex; gap: 8px; align-items: center; }
+  .cat-add button { min-height: 38px; padding: 6px 14px; font-size: 14px; font-weight: 700; border-style: dashed; background: transparent; }
+  .cat-add:has(input) button { display: none; }
+  .cat-head { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; min-height: 34px; }
+  .cat-head strong { flex: 1; min-width: 0; font-size: 14px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: #9fd4ff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cat-head button { width: 32px; height: 32px; padding: 0; border-radius: 8px; font-size: 14px; }
+  .cat-head:has(input) strong, .cat-head:has(input) button { display: none; }
+  .cat-name-edit { flex: 1; min-width: 0; font-size: 15px; }
+  .cat-drop { grid-column: 1 / -1; display: grid; place-items: center; border: 2px dashed #43546b; border-radius: 14px; color: #8fa6c2; font-size: 14px; }
+  /* Einfügemarke als Strich zwischen den Kacheln, damit klar ist, wo die Kachel landet. */
+  .tile-wrap.drop-before::before, .tile-wrap.drop-after::after { content: ""; position: absolute; top: 4px; bottom: 4px; width: 4px;
+    border-radius: 2px; background: #f39200; box-shadow: 0 0 8px #f39200; }
+  .tile-wrap.drop-before::before { left: -8px; }
+  .tile-wrap.drop-after::after { right: -8px; }
+  .tile-wrap.dragging { opacity: .35; }
+  .board-grid.drop-target { outline: 2px dashed #f39200; outline-offset: 4px; }
   .board-tile { height: 100%; min-width: 0; padding: 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; justify-content: center;
     text-align: left; background: #17263b; border: 1px solid #65758d; border-radius: 16px; overflow: hidden; font-weight: 400; }
   .board-tile:hover:not(:disabled) { background: #34445b; }
@@ -89,8 +103,6 @@
   .board-tile small { font-size: 13px; color: #c7d7e9; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .board-tile.is-playing { background: #0f3b2a; border: 2px solid #3fb950; box-shadow: 0 0 14px #3fb95066; }
   .board-tile.is-playing small { color: #9df0ad; font-weight: 700; }
-  .board-tile.is-paused { background: #3b300f; border: 2px dashed #e3b341; }
-  .board-tile.is-paused small { color: #ffe08a; font-weight: 700; }
   .board-tile.is-empty { border-style: dashed; border-color: #76889b; color: #c8d6e9; cursor: default; }
   /*noinspection CssUnusedSymbol*/
   .tile-wrap { position: relative; }
@@ -182,6 +194,18 @@
   .photo-buttons label:focus-within { outline: 3px solid #ffd087; outline-offset: 3px; }
   .photo-buttons input { width: 0; height: 0; opacity: 0; position: absolute; }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  #uploadDialog { width: min(520px, 96vw); }
+  .upload-field { display: block; font-size: 13px; font-weight: 700; color: #d3deeb; }
+  .upload-field input { display: block; width: 100%; margin-top: 6px; background: #080e1c; color: #edf3ff; border: 1px solid #8fa6c2;
+    border-radius: 9px; padding: 8px 10px; min-height: 42px; font: inherit; font-size: 15px; }
+  .upload-or { margin: 10px 0; text-align: center; color: #8fa6c2; font-size: 13px; text-transform: uppercase; letter-spacing: .1em; }
+  #uploadDialog .checkrow input { accent-color: #3fb950; }
+  #uploadDialog .checkrow:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+  #uploadProgress { width: 100%; height: 10px; accent-color: #f39200; }
+  .upload-status { min-height: 1.5em; margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: #c2d1e5; white-space: pre-line; }
+  .upload-status.error { color: #ff8794; }
+  .upload-status.done { color: #9df0ad; }
+  #uploadGo { background: #a65300; border-color: #f39200; font-weight: 700; }
   .vs-frame { width: 640px; max-width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; border: 2px solid #b8c9d9; background: #050a11; }
   /* Die Bühne rendert in fester Größe und wird verkleinert, damit die Vorschau genau wie die echte Ansicht aussieht. */
   .vs-frame iframe { width: 1280px; height: 720px; border: 0; transform: scale(.5); transform-origin: 0 0; pointer-events: none; }
@@ -190,7 +214,7 @@
     .dashboard-shell { grid-template-columns: 1fr; padding: 14px; }
     .soundboard, .dashboard-settings { position: static; }
     .soundboard { max-height: none; overflow: visible; }
-    .media-section .board-grid { overflow: visible; }
+    .board-cats { overflow: visible; }
     .dashboard-settings { height: 720px; min-height: 0; }
   }
   @media (max-width: 580px) {
@@ -254,15 +278,17 @@
     <section class="board-section media-section" aria-labelledby="mediaTitle">
       <h3 id="mediaTitle">🔊 Memes &amp; Sounds</h3>
       <div class="sound-actions">
-        <label title="Medien hinzufügen: Audio, Bild oder Video">＋ <input id="files" type="file" accept="audio/*,image/*,video/*,.mp4,.m4v,.webm,.mov,.mkv,.mp3,.wav,.ogg,.m4a,.aac,.flac,.opus,.gif" multiple aria-label="Medien hinzufügen: Audio-, Bild- oder Videodateien auswählen"></label>
-        <label class="key-toggle" title="Hochgeladene Videos mit grünem Hintergrund auf dem Server freistellen. Das Meme erscheint danach ohne Hintergrund in der Kampfansicht."><input id="greenKey" type="checkbox"> Remove green screen</label>
+        <button id="uploadOpen" type="button" class="upload-button" title="Datei oder URL ins Soundboard holen">⤒ Upload</button>
         <button id="stopMedia" type="button" class="icon" title="Alle Medien stoppen">⏹</button>
       </div>
-      <div id="board" class="board-grid">
-        <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erster Sound</strong><small>Audio hochladen</small></div>
-        <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erstes Meme</strong><small>Bild oder Video hochladen</small></div>
+      <div id="board" class="board-cats">
+        <div class="cat-add" id="catAdd"><button id="addCategory" type="button" title="Neue Kategorie anlegen">＋ Kategorie</button></div>
       </div>
-      <div class="board-footer">Alle Dateien im Ordner <code>memes/</code> des Servers erscheinen hier von selbst und bleiben nach einem Neustart erhalten. Memes erscheinen an zufälligen Stellen der Kampfansicht; ein zweiter Klick pausiert, ein dritter setzt fort. ✎ benennt eine Kachel um, 🗑 löscht sie.</div>
+      <template id="emptyTiles">
+        <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erster Sound</strong><small>Über „Upload“ hinzufügen</small></div>
+        <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erstes Meme</strong><small>Bild oder Video hochladen</small></div>
+      </template>
+      <div class="board-footer">Alle Dateien im Ordner <code>memes/</code> des Servers erscheinen hier von selbst und bleiben nach einem Neustart erhalten. Ein Klick startet, ein zweiter stoppt. Kacheln per Ziehen sortieren oder in eine andere Kategorie schieben; ✎ benennt um, 🗑 löscht.</div>
     </section>
   </section>
 
@@ -367,6 +393,25 @@
   </fieldset>
 </template>
 
+<dialog id="uploadDialog" aria-labelledby="uploadTitle">
+  <h2 id="uploadTitle">⤒ Medien hinzufügen</h2>
+  <p class="hint">Audio, Video oder Bild bis 100 MB. Landet vorne in „Standard“ und bleibt im Ordner <code>memes/</code> des Servers.</p>
+  <form id="uploadForm">
+    <label class="upload-field">Datei hochladen
+      <input id="uploadFile" type="file" multiple accept="audio/*,image/*,video/*,.mp4,.m4v,.webm,.mov,.mkv,.mp3,.wav,.ogg,.m4a,.aac,.flac,.opus,.gif"></label>
+    <div class="upload-or">oder</div>
+    <label class="upload-field">Von URL importieren
+      <input id="uploadUrl" type="url" placeholder="https://…/meme.mp4" autocomplete="off"></label>
+    <label class="checkrow" title="Videos mit grünem Hintergrund auf dem Server freistellen. Das Meme erscheint danach ohne Hintergrund in der Kampfansicht."><input type="checkbox" id="uploadKey" disabled> Remove green screen</label>
+    <progress id="uploadProgress" max="1" value="0" hidden></progress>
+    <p id="uploadStatus" class="upload-status" role="status"></p>
+    <div class="dialog-actions">
+      <button id="uploadCancel" type="button">Abbrechen</button>
+      <button id="uploadGo" type="submit" disabled>Hochladen</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="vsPreview" aria-labelledby="vsPreviewTitle">
   <h2 id="vsPreviewTitle">👁 Vorschau VS-Bildschirm</h2>
   <p class="hint">Standbild ohne Animation; die Kampfansicht bleibt unverändert.</p>
@@ -376,7 +421,7 @@
   </div>
 </dialog>
 <script type="module">
-import { COLORS, act, api, connect, drawFrame, fit, hotkeys, mediaUrl, pathPoly, resizeCanvas, toCanvas, toFrame } from "./common.js";
+import { COLORS, HTTP, act, api, authHeaders, connect, drawFrame, fit, hotkeys, mediaUrl, pathPoly, resizeCanvas, toCanvas, toFrame } from "./common.js";
 
 const byId = (id) => document.getElementById(id);
 const canvas = byId("c");
@@ -497,15 +542,11 @@ const MIME = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
 };
 
-async function upload(file, mime, board = false, key = false) {
+async function upload(file, mime) {
   try {
-    const name = board ? file.name.replace(/\.[^.]+$/, "") : file.name;
     const r = await api("/media", {
       method: "POST", body: file,
-      headers: {
-        "Content-Type": mime, "X-Name": encodeURIComponent(name), "X-Board": board ? "1" : "0",
-        "X-Key": key ? "1" : "0",
-      },
+      headers: { "Content-Type": mime, "X-Name": encodeURIComponent(file.name), "X-Board": "0" },
     });
     return await r.json();
   } catch {
@@ -586,36 +627,211 @@ byId("vsPreview").onclose = () => { byId("vsFrame").src = "about:blank"; };
 // Tippen im Dialog darf keine Tastenkürzel wie Start oder Hindernis auslösen.
 for (const d of document.querySelectorAll("dialog")) d.addEventListener("keydown", (e) => e.stopPropagation());
 
-async function addMedia(file) {
-  const mime = file.type || MIME[file.name.split(".").pop().toLowerCase()] || "";
-  if (!ICON[mime.split("/")[0]]) {
-    byId("message").textContent = `${file.name}: Format nicht unterstützt. Bitte MP4, WebM, MP3, WAV, GIF, PNG oder JPG wählen.`;
+let lastServerText = "";
+const say = (text) => { byId("message").textContent = text; };
+const mimeOf = (name, type = "") => type || MIME[name.split(/[?#]/)[0].split(".").pop().toLowerCase()] || "";
+
+async function send(path, method, body) {
+  try {
+    const r = await api(path, { method, headers: { "Content-Type": "application/json" }, body: body && JSON.stringify(body) });
+    return await r.json();
+  } catch {
+    return { ok: false, message: "Server nicht erreichbar." };
+  }
+}
+
+async function change(path, method, body) {
+  const res = await send(path, method, body);
+  if (!res.ok) say(res.message);
+  await loadBoard();
+  return res;
+}
+
+const uploadDialog = byId("uploadDialog");
+const uploadFile = byId("uploadFile");
+const uploadUrl = byId("uploadUrl");
+const uploadKey = byId("uploadKey");
+let uploading = null;
+let keyWatch = new Set();
+
+function uploadStatus(text, kind = "") {
+  byId("uploadStatus").textContent = text;
+  byId("uploadStatus").className = `upload-status ${kind}`;
+}
+
+function uploadProgress(value) {
+  const bar = byId("uploadProgress");
+  bar.hidden = value === null;
+  // Ohne Wert zeigt der Balken nur „läuft“, etwa solange der Server von der URL lädt.
+  if (value === undefined) bar.removeAttribute("value");
+  else if (value !== null) bar.value = value;
+}
+
+function uploadControls() {
+  const files = [...uploadFile.files];
+  const url = uploadUrl.value.trim();
+  const busy = Boolean(uploading) || keyWatch.size > 0;
+  // Freistellen gibt es nur für Videos; bei einer URL ohne erkennbare Endung entscheidet der Server.
+  const video = files.length ? files.some((f) => mimeOf(f.name, f.type).startsWith("video/"))
+    : Boolean(url) && ["", "video"].includes(mimeOf(url).split("/")[0]);
+  uploadKey.disabled = busy || !video;
+  if (!video) uploadKey.checked = false;
+  uploadFile.disabled = uploadUrl.disabled = busy;
+  byId("uploadGo").disabled = busy || (!files.length && !url);
+  byId("uploadGo").textContent = url ? "Importieren" : "Hochladen";
+  byId("uploadCancel").textContent = keyWatch.size && !uploading ? "Schließen" : "Abbrechen";
+}
+
+function uploadReset() {
+  uploadFile.value = "";
+  uploadUrl.value = "";
+  uploadKey.checked = false;
+  keyWatch = new Set();
+  uploadStatus("");
+  uploadProgress(null);
+  uploadControls();
+}
+
+byId("uploadOpen").onclick = () => {
+  if (!uploading) uploadReset();
+  uploadDialog.showModal();
+};
+uploadFile.onchange = () => {
+  if (uploadFile.files.length) uploadUrl.value = "";
+  uploadStatus("");
+  uploadControls();
+};
+uploadUrl.oninput = () => {
+  if (uploadUrl.value.trim()) uploadFile.value = "";
+  uploadStatus("");
+  uploadControls();
+};
+byId("uploadCancel").onclick = () => {
+  if (uploading instanceof XMLHttpRequest) uploading.abort();
+  uploadDialog.close();
+};
+// Freistellen läuft auf dem Server weiter; den Fortschritt zeigt dann die Kachel.
+uploadDialog.onclose = () => { keyWatch = new Set(); };
+
+function sendFile(file, mime, key) {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    uploading = xhr;
+    xhr.open("POST", HTTP + "/media");
+    const headers = authHeaders({
+      "Content-Type": mime, "X-Name": encodeURIComponent(file.name), "X-Board": "1", "X-Key": key ? "1" : "0",
+    });
+    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
+    // fetch kennt keinen Upload-Fortschritt, darum hier XHR.
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) uploadProgress(e.loaded / e.total); };
+    xhr.onload = () => {
+      try { resolve(JSON.parse(xhr.responseText)); } catch { resolve({ ok: false, message: `Server antwortet mit ${xhr.status}.` }); }
+    };
+    xhr.onerror = () => resolve({ ok: false, message: "Server nicht erreichbar oder Datei zu groß (max. 100 MB)." });
+    xhr.onabort = () => resolve({ ok: false, aborted: true, message: "Abgebrochen." });
+    xhr.send(file);
+  });
+}
+
+byId("uploadForm").onsubmit = async (e) => {
+  e.preventDefault();
+  if (uploading) return;
+  const files = [...uploadFile.files];
+  const url = uploadUrl.value.trim();
+  const key = uploadKey.checked;
+  const done = [];
+  const errors = [];
+  uploading = true;
+  uploadControls();
+  if (url) {
+    uploadStatus("Server lädt die Datei herunter …");
+    uploadProgress(undefined);
+    const res = await send("/media/url", "POST", { url, key });
+    if (res.ok) done.push(res); else errors.push(res.message || "Import fehlgeschlagen.");
+  } else {
+    for (const [i, file] of files.entries()) {
+      const mime = mimeOf(file.name, file.type);
+      if (!ICON[mime.split("/")[0]]) {
+        errors.push(`${file.name}: Format nicht unterstützt. Bitte MP4, WebM, MP3, WAV, GIF, PNG oder JPG wählen.`);
+        continue;
+      }
+      uploadStatus(`${file.name} wird hochgeladen …` + (files.length > 1 ? ` (${i + 1}/${files.length})` : ""));
+      uploadProgress(0);
+      const res = await sendFile(file, mime, key && mime.startsWith("video/"));
+      if (res.ok) done.push(res); else errors.push(`${file.name}: ${res.message}`);
+      if (res.aborted) break;
+    }
+  }
+  uploading = null;
+  await loadBoard();
+  keyWatch = new Set(done.filter((m) => m.processing).map((m) => m.url));
+  uploadProgress(keyWatch.size ? 0 : null);
+  if (errors.length) uploadStatus(errors.join("\n"), "error");
+  else if (keyWatch.size) uploadStatus("Hochgeladen. Green Screen wird auf dem Server entfernt … 0 %");
+  else {
+    uploadDialog.close();
+    say(done.length === 1 ? `„${done[0].name}“ liegt im Soundboard.` : `${done.length} Dateien liegen im Soundboard.`);
+  }
+  uploadControls();
+};
+
+async function uploadKeying(keying = {}) {
+  if (!keyWatch.size || uploading) return;
+  const watched = keyWatch;
+  if ([...watched].some((u) => u in keying)) {
+    const p = [...watched].reduce((a, u) => a + (u in keying ? keying[u] : 1), 0) / watched.size;
+    uploadProgress(p);
+    if (!byId("uploadStatus").classList.contains("error")) {
+      uploadStatus(`Green Screen wird auf dem Server entfernt … ${Math.round(100 * p)} %`);
+    }
     return;
   }
-  const key = byId("greenKey").checked && mime.startsWith("video/");
-  byId("message").textContent = `${file.name} wird hochgeladen …`;
-  const res = await upload(file, mime, true, key);
-  if (!res.ok) { byId("message").textContent = res.message; return; }
-  byId("message").textContent = key ? `${file.name}: Green Screen wird auf dem Server entfernt …`
-    : `${file.name} liegt im Soundboard.`;
-  await loadBoard();
+  keyWatch = new Set();
+  const list = await loadBoard();
+  // Der Zustand kann älter sein als die Antwort auf den Upload; dann weiter beobachten.
+  if (!list || list.some((m) => watched.has(m.url) && m.processing)) {
+    if (uploadDialog.open) keyWatch = watched;
+    return;
+  }
+  const failed = list.filter((m) => watched.has(m.url));
+  uploadProgress(1);
+  if (failed.length) {
+    uploadStatus(`${failed.map((m) => m.name).join(", ")}: Green Screen nicht entfernt. ${state?.message || ""}`
+      + "\nDas Original liegt unverändert im Soundboard.", "error");
+  } else if (!byId("uploadStatus").classList.contains("error")) {
+    uploadStatus("Fertig: Hintergrund entfernt, das Meme liegt im Soundboard.", "done");
+  }
+  uploadControls();
 }
 
 const tiles = new Map();
 const wraps = new Map();
-const TILE_HINT = { playing: "⏸ Läuft – Klick pausiert", paused: "▶ Pausiert – Klick setzt fort" };
+const sections = new Map();
+const EMPTY_TILES = [...byId("emptyTiles").content.children].map((n) => n.cloneNode(true));
+const board = byId("board");
+let categories = [];
+let dragged = null;
 
 function updateTiles(memes = [], keying = {}) {
-  const state = new Map(memes.map((m) => [m.media.url, m.paused ? "paused" : "playing"]));
+  const running = new Set(memes.map((m) => m.media.url));
   tiles.forEach((tile, url) => {
-    const st = state.get(url);
-    const busy = tile.classList.contains("is-processing");
-    tile.classList.toggle("is-playing", st === "playing");
-    tile.classList.toggle("is-paused", st === "paused");
-    tile.querySelector("small").textContent = busy
+    const on = running.has(url);
+    tile.classList.toggle("is-playing", on);
+    tile.querySelector("small").textContent = tile.classList.contains("is-processing")
       ? `Green Screen wird entfernt … ${Math.round(100 * (keying[url] || 0))} %`
-      : TILE_HINT[st] || "In Kampfansicht abspielen";
+      : on ? "⏹ Läuft – Klick stoppt" : "In Kampfansicht abspielen";
   });
+}
+
+function smallButton(text, label, onclick, className = "") {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = className;
+  b.textContent = text;
+  b.title = label;
+  b.setAttribute("aria-label", label);
+  b.onclick = onclick;
+  return b;
 }
 
 function addTile(media) {
@@ -627,55 +843,94 @@ function addTile(media) {
   const label = tile.querySelector("strong");
   label.textContent = media.name;
   label.title = media.name;
-  // Ein Klick startet, der nächste pausiert, der dritte setzt fort; der Server entscheidet anhand der URL.
-  tile.onclick = () => run("cue", { kind: "media", media: { ...media, name: label.textContent } });
-  tiles.set(media.url, tile);
+  const { url, mime, cutout } = media;
+  // Erster Klick startet, der zweite stoppt; der Server entscheidet anhand der URL.
+  tile.onclick = () => run("cue", { kind: "media", media: { url, mime, cutout, name: label.textContent } });
+  tiles.set(url, tile);
   const wrap = document.createElement("div");
   wrap.className = "tile-wrap";
-  const rename = document.createElement("button");
-  rename.type = "button";
-  rename.className = "tile-rename";
-  rename.title = "Umbenennen";
-  rename.setAttribute("aria-label", "Kachel umbenennen");
-  rename.textContent = "✎";
-  rename.onclick = () => renameTile(wrap, label, media.url);
-  const remove = document.createElement("button");
-  remove.type = "button";
-  remove.className = "tile-rename tile-remove";
-  remove.title = "Löschen";
-  remove.setAttribute("aria-label", "Kachel löschen");
-  remove.textContent = "🗑";
-  remove.onclick = async () => {
-    if (!confirm(`„${label.textContent}“ endgültig löschen?`)) return;
-    const res = await (await api(media.url, { method: "DELETE" })).json();
-    if (!res.ok) byId("message").textContent = res.message;
-    await loadBoard();
+  wrap.dataset.url = url;
+  wrap.draggable = true;
+  wrap.ondragstart = (e) => {
+    dragged = wrap;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", label.textContent);
+    wrap.classList.add("dragging");
   };
+  wrap.ondragend = () => {
+    wrap.classList.remove("dragging");
+    dragged = null;
+    clearDrop();
+  };
+  const rename = smallButton("✎", "Kachel umbenennen", () => inlineEdit(wrap, label.textContent, (name) => {
+    label.textContent = name;
+    label.title = name;
+    change(url, "PATCH", { name });
+  }), "tile-rename");
+  const remove = smallButton("🗑", "Kachel löschen", async () => {
+    if (confirm(`„${label.textContent}“ endgültig löschen?`)) await change(url, "DELETE");
+  }, "tile-rename tile-remove");
   wrap.append(tile, rename, remove);
-  wraps.set(media.url, wrap);
+  wraps.set(url, wrap);
   return wrap;
+}
+
+function addSection(c) {
+  const s = { section: document.createElement("section"), head: document.createElement("div"),
+    title: document.createElement("strong"), grid: document.createElement("div"), drop: document.createElement("div"), buttons: {} };
+  s.section.className = "board-cat";
+  s.head.className = "cat-head";
+  s.grid.className = "board-grid";
+  s.grid.dataset.category = c.id;
+  s.drop.className = "cat-drop";
+  s.drop.textContent = "Leer – Kacheln hierher ziehen";
+  s.head.append(s.title);
+  // „Standard“ bleibt fest oben und nimmt die Kacheln gelöschter Kategorien auf.
+  if (c.id !== "standard") {
+    const path = `/categories/${c.id}`;
+    const move = (step) => change(path, "PATCH", { index: categories.findIndex((x) => x.id === c.id) - 1 + step });
+    s.buttons.rename = smallButton("✎", "Kategorie umbenennen",
+      () => inlineEdit(s.head, s.name, (name) => change(path, "PATCH", { name }), "cat-name-edit"));
+    s.buttons.up = smallButton("▲", "Kategorie nach oben", () => move(-1));
+    s.buttons.down = smallButton("▼", "Kategorie nach unten", () => move(1));
+    s.buttons.remove = smallButton("🗑", "Kategorie löschen", () => {
+      if (confirm(`Kategorie „${s.name}“ löschen? Ihre Kacheln wandern nach „Standard“.`)) change(path, "DELETE");
+    });
+    s.head.append(...Object.values(s.buttons));
+  }
+  s.section.append(s.head, s.grid);
+  sections.set(c.id, s);
+  return s;
+}
+
+// Nur bei Änderung umhängen: umgehängte Knoten verlieren sonst Fokus und offene Eingabefelder.
+function setChildren(parent, nodes) {
+  const now = [...parent.children];
+  if (now.length !== nodes.length || nodes.some((n, i) => n !== now[i])) parent.replaceChildren(...nodes);
 }
 
 let boardRev = null;
 let boardLoad = 0;
-const EMPTY_TILES = [...byId("board").children];
 
 // Abgleich statt Neuaufbau: Kacheln mit offenem Umbenennen-Feld und Abspielzustand bleiben erhalten.
 async function loadBoard() {
   const mine = ++boardLoad;
-  let list;
+  let data;
   try {
-    list = await (await api("/media")).json();
+    data = await (await api("/media")).json();
   } catch {
-    byId("message").textContent = "Soundboard konnte nicht geladen werden. Seite neu laden.";
-    return;
+    say("Soundboard konnte nicht geladen werden. Seite neu laden.");
+    return null;
   }
-  if (mine !== boardLoad) return;
+  if (mine !== boardLoad) return null;
+  categories = data.categories;
+  const list = data.memes;
   const seen = new Set(list.map((m) => m.url));
   for (const url of [...wraps.keys()]) {
     if (!seen.has(url)) { wraps.delete(url); tiles.delete(url); }
   }
-  const items = list.map((m) => {
+  const byCat = new Map(categories.map((c) => [c.id, []]));
+  for (const m of list) {
     const wrap = wraps.get(m.url) || addTile(m);
     const tile = tiles.get(m.url);
     const label = tile.querySelector("strong");
@@ -683,27 +938,46 @@ async function loadBoard() {
     tile.classList.toggle("is-processing", Boolean(m.processing));
     tile.disabled = Boolean(m.processing);
     wrap.querySelectorAll(".tile-rename").forEach((b) => { b.disabled = Boolean(m.processing); });
-    return wrap;
+    (byCat.get(m.category) || byCat.get("standard")).push(wrap);
+  }
+  for (const id of [...sections.keys()]) if (!byCat.has(id)) sections.delete(id);
+  const nodes = categories.map((c, i) => {
+    const s = sections.get(c.id) || addSection(c);
+    s.name = c.name;
+    s.title.textContent = c.name;
+    s.title.title = c.name;
+    if (s.buttons.up) {
+      s.buttons.up.disabled = i <= 1;
+      s.buttons.down.disabled = i === categories.length - 1;
+    }
+    const items = byCat.get(c.id);
+    setChildren(s.grid, items.length ? items : !list.length && c.id === "standard" ? EMPTY_TILES : [s.drop]);
+    return s.section;
   });
-  byId("board").replaceChildren(...(items.length ? items : EMPTY_TILES));
+  setChildren(board, [byId("catAdd"), ...nodes]);
   updateTiles(state?.memes, state?.board?.keying);
+  return list;
 }
 
-function renameTile(wrap, label, url) {
-  if (wrap.querySelector("input")) return;
+function inlineEdit(host, value, save, className = "tile-name-edit") {
+  if (host.querySelector("input")) return null;
   const input = document.createElement("input");
-  input.className = "tile-name-edit";
-  input.value = label.textContent;
+  input.className = className;
+  input.value = value;
+  input.maxLength = 40;
   input.setAttribute("aria-label", "Neuer Name");
-  const done = (save) => {
-    // Entfernen löst blur aus; ohne Sperre würde Escape doch speichern.
-    if (!input.isConnected) return;
+  // In einem ziehbaren Element ließe sich der Text sonst nicht mit der Maus markieren.
+  const drag = host.draggable ? host : null;
+  if (drag) drag.draggable = false;
+  let closed = false;
+  const done = (ok) => {
+    // Entfernen löst blur noch während remove() aus; ohne Sperre würde Escape doch speichern.
+    if (closed) return;
+    closed = true;
     const name = input.value.trim();
     input.remove();
-    if (save && name && name !== label.textContent) {
-      label.textContent = name;
-      api(url, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
-    }
+    if (drag) drag.draggable = true;
+    if (ok && name && name !== value) save(name);
   };
   input.onkeydown = (e) => {
     // Sonst löst Enter über die globalen Tastenkürzel den Kampfstart aus.
@@ -712,15 +986,56 @@ function renameTile(wrap, label, url) {
     else if (e.key === "Escape") done(false);
   };
   input.onblur = () => done(true);
-  wrap.append(input);
+  host.append(input);
   input.focus();
   input.select();
+  return input;
 }
-byId("files").onchange = async (e) => {
-  for (const file of e.target.files) await addMedia(file);
-  e.target.value = "";
+
+byId("addCategory").onclick = () => {
+  const input = inlineEdit(byId("catAdd"), "", (name) => change("/categories", "POST", { name }), "cat-name-edit");
+  if (input) input.placeholder = "Name der neuen Kategorie";
 };
 
+// Erste Kachel, vor deren Mitte der Zeiger in Leserichtung steht; dort landet die gezogene Kachel.
+function dropSpot(grid, e) {
+  const items = [...grid.querySelectorAll(":scope > .tile-wrap")].filter((w) => w !== dragged);
+  const index = items.findIndex((w) => {
+    const r = w.getBoundingClientRect();
+    return e.clientY < r.top || (e.clientY <= r.bottom && e.clientX < r.left + r.width / 2);
+  });
+  return { items, index: index < 0 ? items.length : index };
+}
+
+function clearDrop() {
+  board.querySelectorAll(".drop-before, .drop-after, .drop-target")
+    .forEach((el) => el.classList.remove("drop-before", "drop-after", "drop-target"));
+}
+
+board.addEventListener("dragover", (e) => {
+  const grid = e.target.closest?.(".board-grid");
+  if (!dragged || !grid) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  const { items, index } = dropSpot(grid, e);
+  clearDrop();
+  grid.classList.add("drop-target");
+  if (index < items.length) items[index].classList.add("drop-before");
+  else if (items.length) items[items.length - 1].classList.add("drop-after");
+});
+board.addEventListener("dragleave", (e) => { if (!board.contains(e.relatedTarget)) clearDrop(); });
+board.addEventListener("drop", async (e) => {
+  const grid = e.target.closest?.(".board-grid");
+  if (!dragged || !grid) return;
+  e.preventDefault();
+  const wrap = dragged;
+  const { items, index } = dropSpot(grid, e);
+  clearDrop();
+  // Sofort umsetzen, damit nichts zurückspringt; der Abgleich danach übernimmt die Serverreihenfolge.
+  grid.querySelectorAll(":scope > :not(.tile-wrap)").forEach((el) => el.remove());
+  grid.insertBefore(wrap, items[index] || null);
+  await change(wrap.dataset.url, "PATCH", { category: grid.dataset.category, index });
+});
 function click(e, slot) {
   e.preventDefault();
   if (!view || !state?.frame) return;
@@ -769,9 +1084,11 @@ function ui(s) {
   byId("viewTitle").textContent = VIEW_TITLE[s.phase] || "KAMERABILD";
   byId("previewInfo").textContent = s.tracking.fps ? `${s.tracking.fps} FPS · ${s.tracking.latency_ms} MS` : "";
 
-  byId("message").textContent = s.phase === "arena" && s.frame
+  const serverText = s.phase === "arena" && s.frame
     ? `Ecke ${corners.length + 1} von 4 im Bild anklicken (Esc fängt neu an).`
     : (s.busy ? `⏳ ${s.busy} … ` : "") + (s.message || "");
+  // Nur bei neuem Servertext schreiben, sonst löscht jedes Zustandspaket lokale Fehlermeldungen sofort.
+  if (serverText !== lastServerText) byId("message").textContent = lastServerText = serverText;
   const cam = s.camera.error ? `<span class="bad">${s.camera.error}</span>` : `Kamera ${s.camera.source}`;
   const tracking = s.tracking.fps ? `Tracking: ${s.tracking.fps} Bilder/s, ${s.tracking.latency_ms} ms Verzögerung` : "Tracking: aus";
   const trackError = s.tracking.error ? `<br><span class="bad">${s.tracking.error}</span>` : "";
@@ -824,6 +1141,7 @@ function ui(s) {
   }
   byId("obstacle").disabled = byId("powerup").disabled = !fighting;
   updateTiles(s.memes, s.board?.keying);
+  uploadKeying(s.board?.keying);
   // Neue, ersetzte oder freigestellte Dateien im Meme-Ordner melden sich über den Zähler.
   if (s.board && s.board.rev !== boardRev) { boardRev = s.board.rev; loadBoard(); }
   byId("shrink").disabled = !fighting || Boolean(s.zone);

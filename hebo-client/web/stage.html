@@ -586,7 +586,7 @@ function startMedia(m) {
   if (kind !== "image") {
     // Später geöffnete Bühne steigt an der laufenden Stelle ein.
     if (m.played > 0.5) el.addEventListener("loadedmetadata", () => seek(el, m.played), { once: true });
-    if (!m.paused) play(el);
+    play(el);
   }
   el.onended = end;
   el.onerror = end;
@@ -608,11 +608,6 @@ function syncMedia(list = []) {
     if (finished.has(m.id)) continue;
     const p = playing.get(m.id);
     if (!p) { startMedia(m); continue; }
-    if (p.m.paused !== m.paused && p.kind !== "image") {
-      // Beim Umschalten auf die Serverzeit gehen, damit mehrere Bühnen nicht auseinanderlaufen.
-      seek(p.el, m.played);
-      if (m.paused) p.el.pause(); else play(p.el);
-    }
     p.m = m;
   }
 }

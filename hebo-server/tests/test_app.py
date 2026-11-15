@@ -395,18 +395,15 @@ def test_cue_toggles_each_meme_and_checks_kind(app):
     app.act("cue", {"kind": "media", "media": a})
     app.act("cue", {"kind": "media", "media": b})
     memes = app.state(time.monotonic())["memes"]
-    assert [(m["media"]["url"], m["paused"]) for m in memes] == [("/media/1", False), ("/media/2", False)]
-    assert all(0 <= m["x"] <= 1 and 0 <= m["y"] <= 1 for m in memes)
-    # Zweiter Klick pausiert nur dieses Meme, dritter setzt es mit gleicher ID fort.
+    assert [m["media"]["url"] for m in memes] == ["/media/1", "/media/2"]
+    assert all(0 <= m["x"] <= 1 and 0 <= m["y"] <= 1 and "paused" not in m for m in memes)
+    # Zweiter Klick stoppt nur dieses Meme, dritter startet es neu von vorn.
     app.act("cue", {"kind": "media", "media": a})
-    paused = app.state(time.monotonic())["memes"]
-    assert [m["paused"] for m in paused] == [True, False]
-    played = paused[0]["played"]
-    time.sleep(0.05)
-    assert app.state(time.monotonic())["memes"][0]["played"] == played
+    assert [m["media"]["url"] for m in app.state(time.monotonic())["memes"]] == ["/media/2"]
     app.act("cue", {"kind": "media", "media": a})
-    resumed = app.state(time.monotonic())["memes"]
-    assert resumed[0]["id"] == memes[0]["id"] and not resumed[0]["paused"]
+    again = app.state(time.monotonic())["memes"]
+    assert [m["media"]["url"] for m in again] == ["/media/2", "/media/1"]
+    assert again[1]["id"] != memes[0]["id"] and again[1]["played"] < 0.5
     app.act("cue", {"kind": "ended", "id": memes[1]["id"]})
     assert [m["media"]["url"] for m in app.state(time.monotonic())["memes"]] == ["/media/1"]
     app.act("cue", {"kind": "stop"})

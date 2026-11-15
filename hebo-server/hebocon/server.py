@@ -19,7 +19,8 @@ from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from .app import App, UserError
-from .library import MemeLibrary
+from .download import fetch
+from .library import MediaError, MemeLibrary
 from .lobby import ROLE_LABEL, Lobby, LobbyError
 
 log = logging.getLogger(__name__)
@@ -139,8 +140,44 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
         if request.headers.get("x-board") != "1":
             key = await asyncio.to_thread(store.add, body, mime)
             return JSONResponse({"ok": True, "url": f"/media/{key}", "name": name, "mime": mime})
-        entry = await asyncio.to_thread(library.add, body, mime, name, request.headers.get("x-key") == "1")
+        try:
+            key = request.headers.get("x-key") == "1"
+            entry = await asyncio.to_thread(library.add, body, mime, name, key)
+        except MediaError as exc:
+            return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
         return JSONResponse({"ok": True, **library.public(entry)})
+
+    async def import_url(request: Request):
+        if (refused := moderator(request)) is not None:
+            return refused
+        data = await request.json() if await request.body() else {}
+        url = str(data.get("url") or "")
+        try:
+            body, mime, name = await asyncio.to_thread(fetch, url, MAX_MEDIA)
+            entry = await asyncio.to_thread(library.add, body, mime, name, bool(data.get("key")))
+        except MediaError as exc:
+            log.warning("Import von %s abgelehnt: %s", url[:200], exc)
+            return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+        log.info("Meme von %s importiert.", url[:200])
+        return JSONResponse({"ok": True, **library.public(entry)})
+
+    async def categories(request: Request):
+        if (refused := moderator(request)) is not None:
+            return refused
+        data = await request.json() if await request.body() else {}
+        cid = request.path_params.get("cid")
+        try:
+            if request.method == "POST":
+                return JSONResponse({"ok": True, **library.add_category(str(data.get("name") or ""))})
+            if request.method == "DELETE":
+                library.delete_category(cid)
+            elif "index" in data:
+                library.move_category(cid, int(data["index"]))
+            else:
+                library.rename_category(cid, str(data.get("name") or ""))
+        except (MediaError, ValueError, TypeError) as exc:
+            return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+        return JSONResponse({"ok": True})
 
     async def board(_: Request):
         return JSONResponse(library.board())
@@ -167,7 +204,17 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
                 message = "Meme nicht gefunden oder wird gerade freigestellt."
                 return JSONResponse({"ok": False, "message": message}, status_code=400)
             return JSONResponse({"ok": True})
-        name = str((await request.json()).get("name") or "").strip()
+        data = await request.json()
+        if "category" in data:
+            try:
+                moved = library.move(file, str(data["category"]), int(data.get("index", 0)))
+            except (ValueError, TypeError):
+                moved = False
+            if not moved:
+                message = "Kachel oder Kategorie nicht gefunden."
+                return JSONResponse({"ok": False, "message": message}, status_code=400)
+            return JSONResponse({"ok": True})
+        name = " ".join(str(data.get("name") or "").split())
         if not name or not library.rename(file, name):
             message = "Kachel nicht gefunden oder Name leer."
             return JSONResponse({"ok": False, "message": message}, status_code=400)
@@ -213,9 +260,12 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
         Route("/api/{name}", action, methods=["POST"]),
         Route("/media", upload, methods=["POST"]),
         Route("/media", board, methods=["GET"]),
+        Route("/media/url", import_url, methods=["POST"]),
         Route("/media/{key}", download, methods=["GET"]),
         Route("/memes/{file}", meme, methods=["GET"]),
         Route("/memes/{file}", change, methods=["PATCH", "DELETE"]),
+        Route("/categories", categories, methods=["POST"]),
+        Route("/categories/{cid}", categories, methods=["PATCH", "DELETE"]),
         WebSocketRoute("/ws", stream),
     ], middleware=[
         # Die Seiten kommen vom lokalen Webserver des Clients, also von einer anderen Herkunft.

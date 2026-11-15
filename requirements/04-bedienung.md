@@ -52,8 +52,8 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
     für Schrumpfen).
   * Schalter „Lebensleisten & Timer in der Kampfansicht“: blendet Lebensleisten,
     Kampfzeit und Statuszeilen in der Kampfansicht aus, etwa für Ansagen.
-* **Memes & Sounds**: ＋ Medien hinzufügen, Haken „Remove green screen“, ⏹ Medien stoppen,
-  darunter die Kacheln.
+* **Memes & Sounds**: „⤒ Upload“ und ⏹ Medien stoppen, darunter „＋ Kategorie“ und die
+  Kategorien mit ihren Kacheln.
 * ⚔ öffnet ein kleines Fenster mit je einem Steckbrief pro Roboter (blau Roboter 1, rot
   Roboter 2): Bild (am besten PNG mit transparentem Hintergrund; ✕ entfernt es), Name, Team,
   Gewicht, Höhe und optional ein Slogan. Gewicht und Höhe sind freier Text („850 g“).
@@ -62,16 +62,36 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
   Kampfs gesperrt. Hochgeladene Bilder gelten bis zum Beenden der App; beim nächsten Start
   räumt die App sie weg. 👁 zeigt eine kleine, stehende Vorschau des kompletten VS-Bildschirms ohne
   Animation; sie ändert weder Bühne noch Ablauf.
-* ＋ lädt Audio, Bilder oder Videos in die App. Jede Datei wird eine
+* **„⤒ Upload“** öffnet ein kleines Fenster: „Datei“ wählt eine oder mehrere lokale Audio-,
+  Bild- oder Videodateien, „URL“ holt eine Datei von einer direkten http(s)-Adresse. Der
+  Haken „Remove green screen“ ist nur bei Videos wählbar. „Hochladen“ zeigt Fortschritt
+  beim Hochladen und beim Freistellen und schließt das Fenster, sobald alles fertig ist;
+  Fehler stehen im Fenster. „Abbrechen“ bricht einen laufenden Upload ab. Der Server prüft
+  Typ (am Dateiinhalt, nicht nur am Namen), Größe (höchstens 100 MB) und Adresse: nur http
+  und https, keine Zugangsdaten in der Adresse und keine Adressen im lokalen oder privaten
+  Netz (auch nicht über Weiterleitungen).
+* Jede Datei wird eine
   Kachel mit dem Dateinamen ohne Endung; „✎“ benennt sie um (Enter oder Klick daneben
-  übernimmt, Esc verwirft), „🗑“ löscht sie nach Rückfrage samt Datei. Ein Klick spielt sie auf der Bühne ab: Ton unsichtbar (bis
+  übernimmt, Esc verwirft), „🗑“ löscht sie nach Rückfrage samt Datei. Neue Kacheln stehen
+  vorne in „Standard“.
+* **Kategorien**: „Standard“ gibt es immer; sie lässt sich weder umbenennen noch löschen
+  oder verschieben. „＋ Kategorie“ legt eine neue an (Name eingeben, Enter). Eigene
+  Kategorien lassen sich umbenennen (✎), mit ▲/▼ verschieben und löschen (🗑, nach
+  Rückfrage); ihre Kacheln wandern dann ans Ende von „Standard“, Dateien bleiben erhalten.
+  Namen sind eindeutig (Groß-/Kleinschreibung egal).
+* **Ziehen und Ablegen**: Kacheln lassen sich innerhalb einer Kategorie und in andere
+  Kategorien ziehen; eine Linie zeigt, wo sie landen, die Zielkategorie leuchtet. Ziehen
+  spielt nichts ab. Kategorien, Zuordnung und Reihenfolge speichert der Server; sie gelten
+  nach Neustart und auf jedem Gerät gleich.
+* Ein Klick auf eine Kachel spielt sie auf der Bühne ab: Ton unsichtbar (bis
     90 s), Video bis 30 s (freigestellte Memes bis zu ihrem Ende, höchstens 120 s), Bild 6,5 s
     (gezählt wird nur die laufende Zeit). Bilder und Videos erscheinen klein und leicht schräg
     an einer zufälligen Stelle der ganzen Kampfansicht, immer vollständig sichtbar; alle
     Bühnen zeigen sie an derselben relativen Stelle. Ein zweiter Klick auf dieselbe Kachel
-    pausiert nur dieses Medium, ein dritter setzt es an der Stelle fort. Laufende Kacheln
-    sind grün umrandet, pausierte gestrichelt gelb. Mehrere Medien laufen gleichzeitig;
-    „⏹ Medien stoppen“ beendet alle.
+    stoppt nur dieses Medium ganz und nimmt es sofort von allen Bühnen; der nächste Klick
+    startet es von vorn an einer neuen Stelle. Läuft ein Medium zu Ende, gilt es ebenfalls
+    als gestoppt. Laufende Kacheln sind grün umrandet („⏹ Läuft – Klick stoppt“). Mehrere
+    Medien laufen gleichzeitig; „⏹ Medien stoppen“ beendet alle.
   * Die Kacheln stehen gleich groß in 3 Spalten, wenn das Board breit genug ist (Bedienung
     im Vollbild), sonst in 2 Spalten (etwa halber Bildschirm).
   Videos und Ton spielen im App-Fenster mit Ton, ohne dass jemand in die Bühne klickt.
@@ -80,8 +100,9 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
 * **Das Soundboard ist der Ordner `hebo-server/memes/`.** Jede Audio-, Bild- oder Videodatei
   darin wird eine Kachel, beim Start und während der Server läuft (spätestens nach etwa 4 s,
   sobald die Datei fertig kopiert ist); alle Bedienungen sehen neue Kacheln sofort. Hochgeladene
-  Dateien landen ebenfalls dort. Namen und Reihenfolge stehen in `data/soundboard.json` und
-  bleiben über Neustarts erhalten, auch umbenannte Namen. Neue Dateien stehen vorne. Wird
+  Dateien landen ebenfalls dort. Namen, Kategorien und Reihenfolge stehen in
+  `data/soundboard.json` und bleiben über Neustarts erhalten, auch umbenannte Namen. Neue
+  Dateien stehen vorne in „Standard“. Wird
   `X.mp4` durch `X.webm` ersetzt, behält die Kachel Namen und Platz. Löschen per 🗑 löscht die
   Datei im Ordner; Dateien mit Punkt am Anfang werden ignoriert. Ein altes Soundboard aus
   `data/media/board.json` übernimmt der Server beim ersten Start einmalig in den Ordner.
@@ -93,7 +114,7 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
   wenn das WebM geprüft ist (Alphakanal, echte Transparenz, Bildanzahl, Ton). Schon
   freigestellte Videos und Videos ohne Green Screen bleiben unverändert; jede Datei bekommt eine
   Zeile `OK`, `SKIP` oder `FEHLER`. Das Skript darf laufen, während der Server läuft.
-* **Haken „Remove green screen“** beim Hochladen: Das Video wird hochgeladen, die Kachel
+* **Haken „Remove green screen“** im Upload-Fenster: Das Video wird hochgeladen, die Kachel
   erscheint sofort mit „Green Screen wird entfernt … N %“ und ist bis zum Ende gesperrt.
   Danach zeigt sie das freigestellte WebM. Ohne Green Screen oder bei einem Fehler bleibt das
   Original als Kachel und die Bedienung meldet es. Ohne Haken wird die Datei unverändert

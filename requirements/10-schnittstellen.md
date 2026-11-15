@@ -37,7 +37,7 @@ richtigen Server passen.
 
 | Rolle | Darf |
 | --- | --- |
-| `moderator` | alle Aktionen, Medien hochladen, umbenennen, löschen |
+| `moderator` | alle Aktionen, Medien hochladen oder per URL holen, umbenennen, verschieben, löschen, Kategorien ändern |
 | `player` | `ulti` (immer für den eigenen Platz, `player` im Körper wird ignoriert), `cue` mit `kind: "ended"` |
 | `stage` | `cue` mit `kind: "ended"` |
 
@@ -48,12 +48,16 @@ fehlendem Recht 403 und `{"ok": false, "message"}`.
 
 | Pfad | Inhalt |
 | --- | --- |
-| `POST /media` | Datei hochladen: roher Körper, `Content-Type` der Datei, Kopf `X-Name` (URL-kodiert). Ohne `X-Board: 1` ein Steckbriefbild (`/media/<key>`, bis zum Neustart). Mit `X-Board: 1` eine Soundboard-Kachel in `memes/`; `X-Key: 1` stellt ein Video zusätzlich frei. Antwort `{"ok", "url", "name", "mime", "cutout", "processing"}`, höchstens 100 MB |
-| `GET /media` | Soundboard-Kacheln in Board-Reihenfolge: `[{"url", "name", "mime", "cutout", "processing"}]`; `cutout: true` heißt freigestelltes Video mit Alphakanal, die Bühne zeigt es ohne Rahmen; `processing: true` heißt, das Grün wird gerade entfernt |
+| `POST /media` | Datei hochladen: roher Körper, `Content-Type` der Datei, Kopf `X-Name` (URL-kodiert). Ohne `X-Board: 1` ein Steckbriefbild (`/media/<key>`, bis zum Neustart). Mit `X-Board: 1` eine Soundboard-Kachel in `memes/`; `X-Key: 1` stellt ein Video zusätzlich frei. Der Typ wird am Inhalt geprüft. Antwort `{"ok", "url", "file", "name", "mime", "category", "cutout", "processing"}`, höchstens 100 MB |
+| `POST /media/url` | Kachel von einer Adresse holen, Körper `{"url", "key"?}`. Nur http/https ohne Zugangsdaten; Ziele im lokalen oder privaten Netz (auch nach DNS-Auflösung und Weiterleitungen) lehnt der Server ab. Antwort wie `POST /media` |
+| `GET /media` | Soundboard: `{"categories": [{"id", "name"}], "memes": [{"url", "file", "name", "mime", "category", "cutout", "processing"}]}`, beides in Board-Reihenfolge; `categories[0]` ist immer `standard`; `cutout: true` heißt freigestelltes Video mit Alphakanal, die Bühne zeigt es ohne Rahmen; `processing: true` heißt, das Grün wird gerade entfernt |
 | `GET /media/<key>` | Steckbriefbild abrufen |
 | `GET /memes/<datei>` | Meme-Datei abrufen (nur Dateien, die im Soundboard stehen) |
-| `PATCH /memes/<datei>` | Kachel umbenennen, Körper `{"name"}` |
+| `PATCH /memes/<datei>` | Kachel umbenennen, Körper `{"name"}`, oder verschieben, Körper `{"category", "index"}` (`index` zählt nur die Kacheln der Zielkategorie ohne die verschobene) |
 | `DELETE /memes/<datei>` | Kachel und Datei löschen; während des Freistellens nicht möglich |
+| `POST /categories` | Kategorie anlegen, Körper `{"name"}`; Antwort `{"ok", "id", "name"}`. Namen sind ohne Groß-/Kleinschreibung eindeutig |
+| `PATCH /categories/<id>` | umbenennen `{"name"}` oder verschieben `{"index"}` (0 = direkt nach `standard`) |
+| `DELETE /categories/<id>` | Kategorie löschen; ihre Kacheln wandern ans Ende von `standard`. `standard` selbst ist gesperrt |
 
 `url` ist relativ zum Server (`/memes/<datei>` URL-kodiert); die Seiten setzen die Serveradresse davor.
 
@@ -74,7 +78,7 @@ fehlendem Recht 403 und `{"ok": false, "message"}`.
 | `shrink` | – | Arena schrumpfen lassen (nur im Kampf, einmal) |
 | `hud` | `{"on": bool}` | Kampf-HUD auf der Bühne ein- oder ausblenden |
 | `profile` | `{"player": 1 \| 2, "name", "image", "team", "weight", "height", "slogan"}` | Steckbrief für den VS-Bildschirm; alle Felder Text, `image` ist eine `/media/…`-URL. Der Name gilt nur außerhalb eines laufenden Kampfs. |
-| `cue` | `{"kind": "media" \| "stop" \| "ended", "media"?: {"url", "name", "mime", "cutout"?}, "id"?}` | `media` startet ein Medium oder schaltet ein laufendes gleicher URL zwischen Pause und Fortsetzen um; `stop` beendet alle; `ended` meldet die Bühne, wenn Meme `id` zu Ende ist |
+| `cue` | `{"kind": "media" \| "stop" \| "ended", "media"?: {"url", "name", "mime", "cutout"?}, "id"?}` | `media` startet ein Medium oder stoppt ein laufendes gleicher URL ganz (der nächste Klick startet es neu); `stop` beendet alle; `ended` meldet die Bühne, wenn Meme `id` zu Ende ist |
 | `ko` | `{"player": 1 \| 2}` | Roboter sofort auf 0 HP, Kampf endet wie bei einem echten K.O. (nur im Kampf) |
 | `ulti` | `{"player": 1 \| 2}` | Laser-Ulti des Roboters auslösen (nur im Kampf, einmal, wenn geladen) |
 | `abort` | – | Kampf abbrechen |
@@ -116,9 +120,9 @@ Alle Koordinaten in **Pixeln des Originalbildes** (`frame.w` × `frame.h`).
 | `vs` | Ob die Bühne den VS-Bildschirm zeigt: genau in Phase `ready` |
 | `names` | Die zwei Roboternamen (für den VS-Bildschirm) |
 | `profiles` | Zwei Steckbriefe `{"image", "team", "weight", "height", "slogan"}` für den VS-Bildschirm |
-| `memes` | Liste `{id, media, paused, played, x, y, tilt}`. `played` ist die gespielte Zeit in s, `x`/`y` (0–1) der Anteil am freien Platz, damit das Meme auf jeder Bühnengröße ganz sichtbar bleibt. Eine neu geöffnete Bühne steigt bei `played` ein. |
+| `memes` | Liste `{id, media, played, x, y, tilt}`. `played` ist die gespielte Zeit in s, `x`/`y` (0–1) der Anteil am freien Platz, damit das Meme auf jeder Bühnengröße ganz sichtbar bleibt. Eine neu geöffnete Bühne steigt bei `played` ein. |
 | `battle` | Zähler, steigt bei jedem Start. Trennt Ereignisse verschiedener Kämpfe. |
-| `board` | `{"rev", "keying"}`: `rev` steigt, sobald sich die Soundboard-Liste ändert (dann `GET /media` neu laden); `keying` ordnet der `url` jeder gerade freigestellten Kachel den Fortschritt 0–1 zu |
+| `board` | `{"rev", "keying"}`: `rev` steigt, sobald sich Kacheln, Kategorien oder Reihenfolge ändern (dann `GET /media` neu laden); `keying` ordnet der `url` jeder gerade freigestellten Kachel den Fortschritt 0–1 zu |
 | `message` | Klartext für die Bedienung |
 | `busy` | Name der laufenden Hintergrundarbeit oder `null` |
 | `camera` | `source`, `error` |

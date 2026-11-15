@@ -4,14 +4,18 @@
 import json
 import time
 
+import pytest
 from starlette.testclient import TestClient
 
 from hebocon.app import App
 from hebocon.config import Settings
-from hebocon.library import MemeLibrary
+from hebocon.download import fetch
+from hebocon.library import MediaError, MemeLibrary, sniff
 from hebocon.lobby import Lobby
 from hebocon.server import MediaStore, create_server
 from tests.test_memes import write_clip
+
+MP3 = b"ID3\x03\x00\x00\x00\x00\x00\x00" + bytes(32)
 
 
 def lib(tmp_path, **kw):
@@ -19,7 +23,7 @@ def lib(tmp_path, **kw):
 
 
 def names(library):
-    return [(m["url"], m["name"]) for m in library.board()]
+    return [(m["url"], m["name"]) for m in library.board()["memes"]]
 
 
 def test_photos_are_dropped_on_restart(tmp_path):
@@ -45,7 +49,7 @@ def test_new_file_waits_until_copy_is_finished(tmp_path):
     library = lib(tmp_path)
     (tmp_path / "memes" / "neu.mp3").write_bytes(b"x")
     library.scan()
-    assert library.board() == []
+    assert library.board()["memes"] == []
     library.scan()
     assert names(library) == [("/memes/neu.mp3", "neu")]
 
@@ -67,9 +71,9 @@ def test_converted_file_keeps_name_and_place(tmp_path):
 def test_upload_lands_in_folder_and_remove_deletes_it(tmp_path):
     changes = []
     library = MemeLibrary(tmp_path / "memes", tmp_path / "soundboard.json", changes.append, watch=False)
-    entry = library.add(b"mp3", "audio/mpeg", "Tröt?")
-    assert entry["file"] == "Tröt_.mp3" and (tmp_path / "memes" / "Tröt_.mp3").read_bytes() == b"mp3"
-    assert library.add(b"mp3", "audio/mpeg", "Tröt?")["file"] == "Tröt_ (2).mp3"
+    entry = library.add(MP3, "audio/mpeg", "Tröt?")
+    assert entry["file"] == "Tröt_.mp3" and (tmp_path / "memes" / "Tröt_.mp3").read_bytes() == MP3
+    assert library.add(MP3, "audio/mpeg", "Tröt?")["file"] == "Tröt_ (2).mp3"
     assert library.remove("Tröt_.mp3") and not (tmp_path / "memes" / "Tröt_.mp3").exists()
     assert names(library) == [("/memes/Tr%C3%B6t_%20%282%29.mp3", "Tröt?")]
     assert changes == [None, None, None]
@@ -97,13 +101,14 @@ def test_upload_with_green_screen_is_keyed_in_background(tmp_path):
     changes = []
     library = MemeLibrary(tmp_path / "memes", tmp_path / "soundboard.json", changes.append, watch=False)
     entry = library.add(clip.read_bytes(), "video/mp4", "Grün", key=True)
-    assert entry["processing"] and library.board()[0]["processing"]
+    assert entry["processing"] and library.board()["memes"][0]["processing"]
     # Während des Freistellens darf ein Ordnerscan die Kachel nicht verlieren.
     library.scan()
     deadline = time.monotonic() + 120
-    while library.board()[0]["processing"] and time.monotonic() < deadline:
+    while library.board()["memes"][0]["processing"] and time.monotonic() < deadline:
         time.sleep(0.2)
-    assert library.board() == [{"url": "/memes/Gr%C3%BCn.webm", "name": "Grün", "mime": "video/webm",
+    assert library.board()["memes"] == [{"url": "/memes/Gr%C3%BCn.webm", "file": "Grün.webm", "name": "Grün",
+                                         "mime": "video/webm", "category": "standard",
                                 "cutout": True, "processing": False}]
     assert sorted(p.name for p in (tmp_path / "memes").iterdir()) == ["Grün.webm"]
     assert library.keying == {} and None in changes
@@ -116,7 +121,8 @@ def test_routes_serve_only_known_memes_and_need_moderator(tmp_path):
     (tmp_path / "memes" / "Meme_001.mp4").write_bytes(b"video")
     (tmp_path / "geheim.txt").write_text("x")
     with TestClient(create_server(app, tmp_path / "data" / "media", lobby, tmp_path / "memes")) as c:
-        assert c.get("/media").json() == [{"url": "/memes/Meme_001.mp4", "name": "Meme 001",
+        assert c.get("/media").json()["memes"] == [{"url": "/memes/Meme_001.mp4", "file": "Meme_001.mp4",
+                                                     "name": "Meme 001", "category": "standard",
                                             "mime": "video/mp4", "cutout": False, "processing": False}]
         r = c.get("/memes/Meme_001.mp4")
         assert r.status_code == 200 and r.content == b"video" and r.headers["content-type"] == "video/mp4"
@@ -124,9 +130,98 @@ def test_routes_serve_only_known_memes_and_need_moderator(tmp_path):
         assert c.delete("/memes/Meme_001.mp4").status_code == 401
         mod = {"Authorization": "Bearer " + lobby.join("mod", "admin")["token"]}
         rev = app.board_rev
-        r = c.post("/media", content=b"mp3", headers={**mod, "Content-Type": "audio/mpeg", "X-Board": "1",
+        r = c.post("/media", content=MP3, headers={**mod, "Content-Type": "audio/mpeg", "X-Board": "1",
                                                        "X-Name": "Neu"})
         assert r.status_code == 200 and app.board_rev > rev
-        assert [m["name"] for m in c.get("/media").json()] == ["Neu", "Meme 001"]
+        assert [m["name"] for m in c.get("/media").json()["memes"]] == ["Neu", "Meme 001"]
         assert c.delete("/memes/Meme_001.mp4", headers=mod).status_code == 200
         assert not (tmp_path / "memes" / "Meme_001.mp4").exists()
+
+def test_categories_keep_standard_and_move_tiles_back_on_delete(tmp_path):
+    folder = tmp_path / "memes"
+    folder.mkdir()
+    for f in ("a.mp3", "b.mp3", "c.mp3"):
+        (folder / f).write_bytes(b"x")
+    library = lib(tmp_path)
+    fun = library.add_category("Lustig")
+    loud = library.add_category("Laut")
+    with pytest.raises(MediaError):
+        library.add_category("lustig")
+    with pytest.raises(MediaError):
+        library.rename_category("standard", "Neu")
+    with pytest.raises(MediaError):
+        library.delete_category("standard")
+    with pytest.raises(MediaError):
+        library.add_category("x" * 41)
+    assert library.move("c.mp3", fun["id"], 0) and library.move("a.mp3", fun["id"], 0)
+    assert not library.move("b.mp3", "gibtsnicht", 0)
+    library.rename_category(loud["id"], "Sehr laut")
+    library.move_category(loud["id"], 0)
+    again = lib(tmp_path)
+    assert [c["name"] for c in again.board()["categories"]] == ["Standard", "Sehr laut", "Lustig"]
+    assert [(m["file"], m["category"]) for m in again.board()["memes"]] == [
+        ("b.mp3", "standard"), ("a.mp3", fun["id"]), ("c.mp3", fun["id"])]
+    again.delete_category(fun["id"])
+    assert [(m["file"], m["category"]) for m in lib(tmp_path).board()["memes"]] == [
+        ("b.mp3", "standard"), ("a.mp3", "standard"), ("c.mp3", "standard")]
+
+
+def test_move_places_tile_exactly_within_category(tmp_path):
+    folder = tmp_path / "memes"
+    folder.mkdir()
+    for f in ("a.mp3", "b.mp3", "c.mp3", "d.mp3"):
+        (folder / f).write_bytes(b"x")
+    library = lib(tmp_path)
+    library.move("d.mp3", "standard", 1)
+    library.move("a.mp3", "standard", 99)
+    assert [m["file"] for m in lib(tmp_path).board()["memes"]] == ["d.mp3", "b.mp3", "c.mp3", "a.mp3"]
+
+
+def test_old_list_index_becomes_standard(tmp_path):
+    folder = tmp_path / "memes"
+    folder.mkdir()
+    (folder / "a.mp3").write_bytes(b"x")
+    old = [{"file": "a.mp3", "name": "Alt", "mime": "audio/mpeg"}]
+    (tmp_path / "soundboard.json").write_text(json.dumps(old))
+    board = lib(tmp_path).board()
+    assert board["categories"] == [{"id": "standard", "name": "Standard"}]
+    assert [(m["name"], m["category"]) for m in board["memes"]] == [("Alt", "standard")]
+
+
+def test_upload_checks_content_not_just_header(tmp_path):
+    library = lib(tmp_path)
+    with pytest.raises(MediaError):
+        library.add(b"<html>nope</html>", "video/mp4", "boese.mp4")
+    assert library.add(MP3, "", "Hupe.mp3")["name"] == "Hupe"
+    assert sniff(b"\x1aE\xdf\xa3" + bytes(8)) == "video/webm"
+    assert sniff(b"\x00\x00\x00\x18ftypisom") == "video/mp4"
+
+
+@pytest.mark.parametrize("url", ["http://127.0.0.1/x.mp3", "http://10.0.0.5/x.mp3", "http://192.168.0.1/a.mp4",
+                                 "http://[::1]/x.mp3", "http://localhost/x.mp3", "file:///C:/Windows/win.ini",
+                                 "ftp://example.com/x.mp3", "http://user:pw@example.com/x.mp3", "nix"])
+def test_url_import_refuses_local_and_odd_urls(url):
+    with pytest.raises(MediaError):
+        fetch(url, 1000)
+
+
+def test_category_and_url_routes_need_moderator(tmp_path):
+    lobby = Lobby(tmp_path / "lobby.json", "admin")
+    app = App(Settings(segment_enabled=False, intro_s=0, _env_file=None), lobby=lobby)
+    (tmp_path / "memes").mkdir()
+    (tmp_path / "memes" / "a.mp3").write_bytes(b"x")
+    with TestClient(create_server(app, tmp_path / "data" / "media", lobby, tmp_path / "memes")) as c:
+        assert c.post("/categories", json={"name": "X"}).status_code == 401
+        assert c.post("/media/url", json={"url": "http://127.0.0.1/x.mp3"}).status_code == 401
+        mod = {"Authorization": "Bearer " + lobby.join("mod", "admin")["token"]}
+        r = c.post("/media/url", json={"url": "http://127.0.0.1:8765/media"}, headers=mod)
+        assert r.status_code == 400 and "privaten Netz" in r.json()["message"]
+        cid = c.post("/categories", json={"name": "Hupen"}, headers=mod).json()["id"]
+        assert c.patch("/memes/a.mp3", json={"category": cid, "index": 0}, headers=mod).status_code == 200
+        assert c.patch(f"/categories/{cid}", json={"name": "Tröten"}, headers=mod).status_code == 200
+        assert c.delete("/categories/standard", headers=mod).status_code == 400
+        board = c.get("/media").json()
+        assert board["categories"][1] == {"id": cid, "name": "Tröten"}
+        assert board["memes"][0]["category"] == cid
+        assert c.delete(f"/categories/{cid}", headers=mod).status_code == 200
+        assert c.get("/media").json()["memes"][0]["category"] == "standard"

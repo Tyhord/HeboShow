@@ -26,7 +26,8 @@ Zwei getrennte Programme im LAN, kein Docker, kein Internet:
 | `hebocon/tracking.py` | Zwei Roboter-Plätze aus der Leerbild-Differenz, Aussehens-Abgleich, EdgeTAM-Schiedsrichter |
 | `hebocon/game.py` | HP-Regeln, reine Logik ohne Bild |
 | `hebocon/server.py` | Starlette: Anmeldung, Rechte, REST-Aktionen, WebSocket, Steckbriefbilder in `data/media/`, Meme-Dateien aus `memes/` |
-| `hebocon/library.py` | Soundboard: Ordner `memes/` überwachen, Index `data/soundboard.json`, Upload, Freistellen im Hintergrund |
+| `hebocon/library.py` | Soundboard: Ordner `memes/` überwachen, Index `data/soundboard.json` mit Kategorien und Reihenfolge, Dateityp am Inhalt prüfen, Upload, Freistellen im Hintergrund |
+| `hebocon/download.py` | Medien-Import per URL: nur öffentliche http(s)-Ziele, verbindet zur geprüften IP, folgt Weiterleitungen mit erneuter Prüfung |
 | `hebocon/memes.py` | Green Screen erkennen und entfernen (VP9 mit Alpha), Ergebnis prüfen, Original ersetzen |
 | `greenscreen.py` | Kommando: alle Videos in `memes/` freistellen |
 

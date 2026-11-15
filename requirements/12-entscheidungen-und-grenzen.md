@@ -6,13 +6,23 @@
 
 **Bühnen-Einblendungen laufen über den App-Zustand.**
 Medien und VS-Bildschirm kommen als `memes`/`vs`/`profiles` im Zustand an, nicht von Fenster
-zu Fenster. Die App führt die Liste laufender Memes samt Pause, gespielter Zeit und
+zu Fenster. Die App führt die Liste laufender Memes samt gespielter Zeit und
 Position; jede Bühne gleicht sich daran ab, auch eine später geöffnete. So klappt es gleich, ob Bühne und Bedienung in pywebview oder in getrennten
 Browsern laufen. Die K.O.-Knöpfe gehen dagegen über die Spielregeln (`ko`), damit HP,
 Sieger und Kampfzeit stimmen. Soundboard-Dateien liegen im Ordner `memes/` und überleben einen
 Neustart, damit Memes nicht vor jeder Veranstaltung neu hochgeladen werden müssen. Der Ordner
 ist die Quelle: Wer Dateien hineinlegt, braucht keinen Upload. Steckbriefe
 sind nicht dauerhaft; ihre Bilder löscht die App deshalb beim nächsten Start.
+
+**Zweiter Klick auf ein Meme stoppt statt zu pausieren.**
+Ein pausiertes Meme blieb als Standbild auf der Bühne stehen und musste extra weggeklickt
+werden. Stoppen nimmt es sofort weg; wer es wieder will, startet es von vorn.
+
+**URL-Import nur aus dem öffentlichen Netz.**
+Der Server lädt die Datei selbst herunter. Damit niemand über die Bedienung Geräte im
+Veranstaltungsnetz oder den Server selbst abfragt, lehnt er Ziele im lokalen, privaten oder
+Loopback-Netz ab, prüft jede Weiterleitung neu und verbindet zur bereits geprüften IP.
+Medien aus dem eigenen Netz kommen über „Datei“ oder direkt in den Ordner `memes/`.
 
 **Laser-Ulti lädt durch Schaden und ist ausweichbar.**
 Die Ulti lädt nur über erlittenen Schaden, damit sie als Comeback-Mittel wirkt und nicht

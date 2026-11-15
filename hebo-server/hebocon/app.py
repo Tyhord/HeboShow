@@ -329,24 +329,18 @@ class App:
             if not (media and media.get("url")):
                 raise UserError("Medium fehlt.")
             running = next((m for m in self.memes if m["media"]["url"] == media["url"]), None)
-            if running is None:
+            if running is not None:
+                # Zweiter Klick stoppt ganz; der nächste startet wieder von vorn.
+                self.memes.remove(running)
+            else:
                 self._meme_ids += 1
                 rng = self._meme_rng
                 # Position als Anteil des freien Platzes; jede Bühne rechnet sie mit der echten Größe um.
-                self.memes.append({"id": self._meme_ids, "media": media, "paused": False, "played": 0.0,
-                                   "since": t, "x": rng.random(), "y": rng.random(),
+                self.memes.append({"id": self._meme_ids, "media": media, "since": t,
+                                   "x": rng.random(), "y": rng.random(),
                                    "tilt": round(rng.uniform(-4, 4), 1)})
-            elif running["paused"]:
-                running["paused"], running["since"] = False, t
-            else:
-                running["played"] += t - running["since"]
-                running["paused"] = True
         else:
             raise UserError("Unbekannte Einblendung.")
-
-    @staticmethod
-    def _meme_played(m: dict, t: float) -> float:
-        return m["played"] + (0.0 if m["paused"] else t - m["since"])
 
     def _meme_state(self, t: float) -> list[dict]:
         def limit(m: dict) -> float:
@@ -354,9 +348,9 @@ class App:
                 return CUTOUT_LIMIT_S
             return MEME_LIMIT_S.get(m["media"].get("mime", "").split("/")[0], CUTOUT_LIMIT_S)
 
-        self.memes = [m for m in self.memes if self._meme_played(m, t) < limit(m)]
-        return [{"id": m["id"], "media": m["media"], "paused": m["paused"],
-                 "played": round(self._meme_played(m, t), 2), "x": m["x"], "y": m["y"], "tilt": m["tilt"]}
+        self.memes = [m for m in self.memes if t - m["since"] < limit(m)]
+        return [{"id": m["id"], "media": m["media"], "played": round(t - m["since"], 2),
+                 "x": m["x"], "y": m["y"], "tilt": m["tilt"]}
                 for m in self.memes]
 
     def do_balancing(self, key: str, value: float) -> None:
