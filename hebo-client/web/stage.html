@@ -164,6 +164,27 @@
     @keyframes vs-pop { from { opacity: 0; scale: .6; } to { opacity: 1; scale: 1; } }
   }
 
+  /* Nur im Spieler-Client: eigene Laser-Ulti unten mittig. */
+  .my-ulti { position: absolute; z-index: 4; left: 50%; bottom: 18px; translate: -50% 0; display: flex; flex-direction: column;
+    align-items: center; gap: 6px; }
+  .my-ulti button { --c: #00e5ff; --charge: 0%; min-width: clamp(180px, 22vw, 300px); padding: 12px 22px; border: 3px solid #5d6675;
+    border-radius: 999px; color: #8b95a5; font: 900 clamp(14px, 1.6vw, 20px)/1.2 "Segoe UI", system-ui, sans-serif;
+    letter-spacing: .12em; text-transform: uppercase; cursor: not-allowed; filter: grayscale(.85);
+    background: linear-gradient(to right, #5d667555 var(--charge), #10131bd9 var(--charge)); box-shadow: 0 4px 14px #000a; }
+  .my-ulti button.ready { border-color: var(--c); color: #fff; cursor: pointer; filter: none;
+    background: color-mix(in srgb, var(--c) 38%, #10131b); animation: my-ulti-glow 1.6s ease-in-out infinite; }
+  @keyframes my-ulti-glow {
+    0%, 100% { box-shadow: 0 0 10px var(--c), 0 4px 14px #000a; scale: 1; }
+    50% { box-shadow: 0 0 34px var(--c), 0 0 60px color-mix(in srgb, var(--c) 45%, transparent); scale: 1.04; } }
+  .my-ulti small { min-height: 1.3em; color: #ffd0d6; font-size: 12px; text-shadow: 0 1px 4px #000; text-align: center; }
+  .my-ulti small button { all: unset; margin-left: 8px; color: #fff; text-decoration: underline; cursor: pointer; }
+  /* Dunkelrote Vignette bei wenig HP; Mitte bleibt frei, --low (0–1) steigt Richtung 0 HP. */
+  .low-hp { --low: 0; position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .8s;
+    background: radial-gradient(ellipse 75% 70% at 50% 50%, transparent calc(62% - 12% * var(--low)),
+      #5a000a99 calc(84% - 10% * var(--low)), #2a0004f2 100%); }
+  .low-hp.on { opacity: calc(.6 + .4 * var(--low)); animation: low-hp-pulse calc(3.2s - 1.2s * var(--low)) ease-in-out infinite; }
+  @keyframes low-hp-pulse { 0%, 100% { filter: brightness(.75); } 50% { filter: brightness(1.25) saturate(1.3); } }
+
   [hidden] { display: none !important; }
   @media (max-width: 600px) {
     .hud { gap: 8px; top: 18px; }
@@ -199,6 +220,11 @@
   </header>
   <div class="bottom">LIVE ARENA <span>●</span></div>
   <div class="status" id="status">VERBINDE …</div>
+  <div class="low-hp" id="lowHp" aria-hidden="true"></div>
+  <div class="my-ulti" id="myUlti" hidden>
+    <button id="ultiBtn" type="button" aria-disabled="true" title="Laser-Ulti zünden (Leertaste)">⚡ Laser-Ulti</button>
+    <small id="ultiMsg" role="status"></small>
+  </div>
   <div class="callout" id="callout" hidden></div>
   <div class="winner-banner" id="winner" hidden></div>
   <div class="countdown" id="countdown" hidden aria-live="assertive"></div>
@@ -232,7 +258,8 @@
 <div class="media-overlay" id="media" aria-live="polite"></div>
 <div class="ko-overlay" id="ko" aria-live="assertive"><span class="ko-text" aria-label="Knockout">K.O.!</span></div>
 <script type="module">
-import { act, COLORS, connect, drawFrame, fit, hotkeys, mediaUrl, pathPoly, resizeCanvas, ROLE, toCanvas } from "./common.js";
+import { act, COLORS, connect, drawFrame, fit, hotkeys, HTTP, mediaUrl, NAME, pathPoly, resizeCanvas, ROLE, toCanvas,
+  TOKEN } from "./common.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("c");
@@ -256,6 +283,104 @@ const finished = new Set();
 const PREVIEW = new URLSearchParams(location.search).has("preview");
 // Nur die Moderation darf steuern; auf anderen Geräten liefen die Kürzel ins Leere.
 if (!PREVIEW && ROLE === "moderator") hotkeys();
+
+// Spieler-Client: eigene Ulti und Wenig-HP-Vignette direkt in der Bühne, ohne zweites Fenster.
+const PLAYER = !PREVIEW && ROLE === "player";
+let mySlot = null;
+let ultiBusy = false;
+let ultiMsgTimer = 0;
+let authLost = false;
+
+function ultiMessage(text, sticky = false) {
+  clearTimeout(ultiMsgTimer);
+  $("ultiMsg").textContent = text;
+  if (text && !sticky) ultiMsgTimer = setTimeout(() => { $("ultiMsg").textContent = ""; }, 4000);
+}
+
+async function fireUlti() {
+  const btn = $("ultiBtn");
+  if (ultiBusy || !btn.classList.contains("ready")) return;
+  ultiBusy = true;
+  // Der Server setzt den eigenen Platz selbst ein; fremde Ultis kann ein Spieler so nicht auslösen.
+  const r = await act("ulti", {});
+  ultiBusy = false;
+  if (r && !r.ok && r.message) ultiMessage(r.message);
+}
+
+async function rejoin() {
+  ultiMessage("Melde an …", true);
+  try {
+    const res = await fetch(`${HTTP}/lobby/join`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: NAME, token: TOKEN }),
+    });
+    const r = await res.json();
+    if (!r.ok) { ultiMessage(r.message, true); return; }
+    // Neues Token heißt neue Sitzung; die Seite muss es für Verbindung und Aktionen kennen.
+    if (r.token !== TOKEN) {
+      const params = new URLSearchParams(location.search);
+      params.set("token", r.token);
+      location.search = params.toString();
+    }
+    authLost = false;
+    ultiMessage("");
+  } catch {
+    ultiMessage("Server nicht erreichbar.", true);
+  }
+}
+
+function showAway(text) {
+  const msg = $("ultiMsg");
+  if (msg.querySelector("button")) return;
+  clearTimeout(ultiMsgTimer);
+  msg.textContent = text;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = "Wieder anmelden";
+  b.onclick = rejoin;
+  msg.append(b);
+}
+
+function updatePlayer(s) {
+  const me = s.lobby?.players.find((p) => p.name.toLowerCase() === NAME.toLowerCase());
+  mySlot = me ? me.slot : null;
+  const robot = mySlot ? s.robots.find((r) => r.id === mySlot) : null;
+  const u = robot?.ulti || { charge: 0, ready: false, used: false };
+  const ready = Boolean(mySlot && s.phase === "fight" && u.ready);
+  const btn = $("ultiBtn");
+  btn.style.setProperty("--c", mySlot ? COLORS[mySlot] : "#8b98a9");
+  btn.style.setProperty("--charge", `${u.used ? 0 : Math.round(100 * u.charge)}%`);
+  btn.classList.toggle("ready", ready);
+  btn.setAttribute("aria-disabled", String(!ready));
+  btn.textContent = !mySlot ? "⚡ Kein Spielerplatz"
+    : u.used ? "⚡ Ulti verbraucht"
+    : ready ? "⚡ Laser-Ulti bereit"
+    : s.phase !== "fight" ? "⚡ Ulti im Kampf"
+    : `⚡ Ulti ${Math.round(100 * u.charge)} %`;
+  if (!mySlot || authLost) {
+    showAway(authLost ? "Anmeldung abgelaufen." : "Du hast gerade keinen Spielerplatz.");
+  } else if ($("ultiMsg").querySelector("button")) {
+    ultiMessage("");
+  }
+
+  // Nur das eigene Fenster des betroffenen Spielers zeigt die Vignette; Bühne und Moderation nicht.
+  const frac = robot && robot.max_hp > 0 ? Math.max(0, robot.hp) / robot.max_hp : 1;
+  const low = $("lowHp");
+  const on = frac < 0.25;
+  low.classList.toggle("on", on);
+  if (on) low.style.setProperty("--low", (1 - frac / 0.25).toFixed(2));
+}
+
+if (PLAYER) {
+  $("myUlti").hidden = false;
+  $("ultiBtn").onclick = (e) => { e.currentTarget.blur(); fireUlti(); };
+  window.addEventListener("keydown", (e) => {
+    if (e.code !== "Space") return;
+    // Sonst löste ein fokussierter Knopf die Leertaste zusätzlich als Klick aus.
+    e.preventDefault();
+    if (!e.repeat) fireUlti();
+  });
+}
 
 // Giftrauch außerhalb des Felds: Wolken einmal vorrendern und pro Bild nur verschieben, damit die Bühne flüssig bleibt.
 function cloudSprite(rgb) {
@@ -1130,10 +1255,11 @@ if (PREVIEW) {
     lastPacket = performance.now();
     if (bitmap) { frame?.close?.(); frame = bitmap; }
     updateHud(s);
+    if (PLAYER) updatePlayer(s);
     updateIntro(s);
     updateCountdown(s);
     if (s.vs && s.frame?.kind === "arena") drawPortraits(s);
-  });
+  }, { onAuthLost: () => { if (PLAYER) { authLost = true; showAway("Anmeldung abgelaufen."); } } });
   requestAnimationFrame(draw);
 }
 </script>

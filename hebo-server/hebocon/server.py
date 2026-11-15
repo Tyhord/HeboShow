@@ -201,7 +201,7 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
             # Eigener Code, damit der Client „neu anmelden“ von einem Netzaussetzer unterscheiden kann.
             await ws.close(code=4401)
             return
-        # Das Spielerfenster braucht kein Kamerabild; spart im WLAN viel Bandbreite.
+        # Fenster ohne Kamerabild (frames=0) sparen im WLAN viel Bandbreite.
         frames = ws.query_params.get("frames", "1") != "0"
         client = ws.client.host if ws.client else "?"
         lobby.connected(token, +1)

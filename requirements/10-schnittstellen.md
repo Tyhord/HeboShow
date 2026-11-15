@@ -89,8 +89,8 @@ Während `busy` gesetzt ist, sind nur `camera`, `abort`, `spawn`, `shrink`, `hud
 
 Ohne gültiges Token schließt der Server sofort mit Code `4401`; die Seite meldet „neu
 anmelden“ und versucht es alle 3 s weiter. Bei anderen Abbrüchen verbindet sie sich nach
-1 s neu und bekommt sofort den aktuellen Zustand. `frames=0` (Spieleransicht) lässt das
-JPEG weg.
+1 s neu und bekommt sofort den aktuellen Zustand. `frames=0` lässt das JPEG weg (für
+Seiten ohne Kamerabild; die Bühne nutzt `frames=1`, auch beim Spieler).
 
 Binärnachricht pro Kamerabild:
 

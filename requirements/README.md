@@ -12,7 +12,7 @@ Wer neu dazukommt, liest von oben nach unten.
 | [01-ueberblick.md](01-ueberblick.md) | Was ist Hebocon, wer benutzt die App, was sie nicht tut |
 | [02-spielregeln.md](02-spielregeln.md) | HP, Ringout, Kollision, Hindernisse, Power-ups, Sieg |
 | [03-match-ablauf.md](03-match-ablauf.md) | Vom Arena-Scan bis zum Sieger, Schritt für Schritt |
-| [04-bedienung.md](04-bedienung.md) | Anmeldung im Client, Bühne, Bedienung, Spieleransicht, Knöpfe, Tasten |
+| [04-bedienung.md](04-bedienung.md) | Anmeldung im Client, Bühne, Bedienung, Spieler-Ulti, Knöpfe, Tasten |
 | [05-kamera-quellen.md](05-kamera-quellen.md) | USB-Kamera, Stream, Videodatei |
 | [06-spielfeld-erkennung.md](06-spielfeld-erkennung.md) | Vier Ecken, Leerbild, Vordergrund |
 | [07-fahrzeug-erkennung.md](07-fahrzeug-erkennung.md) | Registrierung, Tracking über das Leerbild, EdgeTAM optional |

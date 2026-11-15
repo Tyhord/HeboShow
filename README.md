@@ -13,7 +13,7 @@ Roboter, verfolgt sie, führt HP und zeigt Effekte für das Publikum.
   EdgeTAM kann optional nebenher die Identitäten prüfen
 * Ein **Server** (`hebo-server/`) rechnet alles: Kamera, Tracking, HP, Effekte, Balancing,
   Spieler und gespeicherte Daten. Beliebig viele **Clients** (`hebo-client/`) im selben
-  LAN zeigen Bühne, Bedienung oder Spieleransicht. Internet ist nicht nötig.
+  LAN zeigen Bühne (beim Spieler mit eigener Ulti) oder Bedienung. Internet ist nicht nötig.
 
 ## Start
 
@@ -50,7 +50,7 @@ Dann fragt er `name:`:
 | --- | --- | --- |
 | `stage` | Bühne | Kampfansicht, beliebig viele gleichzeitig |
 | `mod` oder `moderator` | Moderation, fragt nach dem Passwort | Kampfansicht und Bedienung |
-| jeder andere Name | Spieler 1 bzw. 2 | Kampfansicht und Spieleransicht mit HP und Laser-Ulti (Leertaste) |
+| jeder andere Name | Spieler 1 bzw. 2 | Kampfansicht mit eigenem Ulti-Knopf unten mittig (Klick oder Leertaste) und roter Vignette bei wenig HP |
 
 Spielernamen sind eindeutig (Groß-/Kleinschreibung egal) und werden zum Roboternamen.
 Sind beide Plätze belegt, bietet der Client an, als Bühne zu verbinden. Wer denselben

@@ -257,13 +257,11 @@ def main() -> None:
                           "--disable-features=ElasticOverscroll --autoplay-policy=no-user-gesture-required")
     import webview
 
-    webview.create_window("Hebocon Bühne", f"{base}/stage.html?{query}", width=1280, height=760,
+    webview.create_window(f"Hebocon Spieler – {result['name']}" if role == "player" else "Hebocon Bühne",
+                          f"{base}/stage.html?{query}", width=1280, height=760,
                           fullscreen=bool(cfg.get("stage_fullscreen", False)), background_color="#000000")
     if role == "moderator":
         webview.create_window("Hebocon Bedienung", f"{base}/operator.html?{query}", width=1300, height=900)
-    elif role == "player":
-        webview.create_window(f"Hebocon Spieler – {result['name']}", f"{base}/player.html?{query}",
-                              width=480, height=640, background_color="#0b0e14")
 
     stop = threading.Event()
     threading.Thread(target=watch, args=(server, stop), name="watch", daemon=True).start()

@@ -34,9 +34,8 @@ Zwei getrennte Programme im LAN, kein Docker, kein Internet:
 | --- | --- |
 | `client.py` | Server suchen oder IP abfragen, `name:` und Passwort abfragen, anmelden, Seiten lokal ausliefern, pywebview-Fenster öffnen, Verbindung überwachen |
 | `web/common.js` | Serveradresse und Token aus der URL, `api()`, `connect()`, Zeichnen |
-| `web/stage.html` | Bühne |
+| `web/stage.html` | Bühne; beim Spieler zusätzlich eigener Ulti-Knopf und Wenig-HP-Vignette |
 | `web/operator.html` | Bedienung |
-| `web/player.html` | Spieleransicht |
 | `client.json` | Letzter Server und Tokens je Server und Rolle |
 
 ## Threads Server

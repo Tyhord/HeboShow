@@ -23,8 +23,8 @@ und wählt per Name eine Rolle:
   Roboter, startet den Kampf, spawnt Objekte von Hand. Bekommt Bühne und Bedienung.
 * **Publikum** sieht die **Bühne** (`stage`): Kamerabild mit leuchtenden Umrissen, HP-Balken,
   Effekten und Siegeranzeige. Gedacht für Beamer oder zweiten Bildschirm, beliebig viele.
-* **Spieler** (jeder andere Name, höchstens zwei): Bühne plus eigene Spieleransicht mit HP
-  und Laser-Ulti. Der Name wird zum Roboternamen.
+* **Spieler** (jeder andere Name, höchstens zwei): Bühne mit eigenem Laser-Ulti-Knopf
+  und Wenig-HP-Vignette, alles in einem Fenster. Der Name wird zum Roboternamen.
 
 ## Was sie nicht tut
 

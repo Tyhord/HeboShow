@@ -8,9 +8,9 @@ verbindet.
 
 | Fenster | Seite | Wer | Zweck |
 | --- | --- | --- | --- |
-| Hebocon Bühne | `stage.html` | alle | Für das Publikum, auf Wunsch Vollbild |
+| Hebocon Bühne | `stage.html` | Publikum, Moderation | Für das Publikum, auf Wunsch Vollbild |
 | Hebocon Bedienung | `operator.html` | Moderation | Für die Bedienung |
-| Hebocon Spieler | `player.html` | Spieler | Eigene HP und Laser-Ulti |
+| Hebocon Spieler – Name | `stage.html` | Spieler | Bühne plus eigene Laser-Ulti und Wenig-HP-Vignette |
 
 ## Anmeldung im Client
 
@@ -140,12 +140,22 @@ Die Tasten gelten in Bedienung und Bühne, aber nur beim Client der Moderation.
 
 ## Spieleransicht
 
-Kleines Fenster für jeden Spieler. Oben der eigene Name in der Farbe des Platzes (blau
-Spieler 1, rot Spieler 2), darunter HP als Zahl und Balken, die Phase bzw. Countdown und
-am Ende der Sieger. Der große ⚡-Knopf (oder Leertaste) löst die eigene Laser-Ulti aus; er
-füllt sich mit der Ladung und ist nur im Kampf bei voller Ladung aktiv. Unten stehen
-Meldungen und der Verbindungsstatus. Wurde der Platz frei (entfernt), zeigt die Seite
-„Kein Platz“ und einen Knopf zum erneuten Beitreten.
+Spieler bekommen nur ein Fenster: die normale Bühne, ergänzt um zwei Elemente, die nur
+dieser Spieler sieht. Kein zweites Fenster, kein eigenes Python-Programm.
+
+* **Ulti-Knopf unten mittig.** Inaktiv grau mit „ULTI x %“ und einer Füllung nach der
+  Ladung. Im Kampf bei voller Ladung leuchtet er in der Farbe des Platzes, pulsiert sanft
+  und zeigt „LASER-ULTI BEREIT“. Klick oder Leertaste löst die eigene Ulti aus. Der
+  Server setzt dabei immer den eigenen Platz ein, ein Spieler kann also nur seine Ulti
+  zünden. Nach dem Einsatz steht dort „Ulti verbraucht“. Fehlermeldungen des Servers
+  erscheinen kurz darunter.
+* **Wenig-HP-Vignette.** Fallen die eigenen HP unter 25 % der Maximal-HP, legt sich eine
+  dunkelrote Vignette um die Bildränder und pulsiert langsam. Die Mitte bleibt frei. Je
+  näher die HP an 0 gehen, desto kräftiger, breiter und schneller wird sie. Ab 25 %
+  verschwindet sie wieder. Andere Spieler, Moderation und Publikum sehen sie nicht.
+
+Wurde der Platz frei (entfernt) oder die Anmeldung ist abgelaufen, steht unter dem Knopf
+ein Hinweis mit „Wieder anmelden“.
 
 ## Bühne
 

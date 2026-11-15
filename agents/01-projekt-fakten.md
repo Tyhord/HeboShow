@@ -36,7 +36,7 @@ hebo-server/
 hebo-client/
   start.bat         fragt name:
   client.py         Suche, Anmeldung, Fenster
-  web/              operator.html, stage.html, player.html, common.js
+  web/              operator.html, stage.html (auch Spieler), common.js
   client.json       letzter Server und Tokens, nicht im Git
 requirements/       Fachlichkeit
 ```
