@@ -2,7 +2,7 @@
 """Hebocon-Client: findet den Server im LAN, meldet sich mit Namen an und öffnet die passenden Fenster.
 
 Der Client hat kein eigenes Spiel. Er liefert nur die Seiten aus web/ lokal aus; Zustand, Aktionen und
-Medien kommen vom Server. Mit dem Namen „KI“ fährt stattdessen ein Copilot-Modell (pilot.py).
+Medien kommen vom Server. Mit dem Namen „KI“ fährt stattdessen ein Copilot- oder OpenAI-Modell (pilot.py).
 """
 
 import argparse

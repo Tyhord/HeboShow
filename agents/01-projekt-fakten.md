@@ -15,8 +15,8 @@
 * KI-Client (`hebo-client/pilot.py`, Name `KI`/`AI`): `github-copilot-sdk` (lädt die
   Copilot-Laufzeit beim ersten Start aus dem Internet), `bleak` für Bluetooth, `opencv-python-headless`
   und `numpy` fürs Bild. Anmeldung über die Copilot-CLI auf dem KI-PC (`copilot`, dann
-  `/login`) oder `COPILOT_GITHUB_TOKEN`. Ohne Roboter testen mit „Probelauf ohne Roboter“.
-  Der Server kennt kein Copilot und kein Bluetooth.
+  `/login`) oder `COPILOT_GITHUB_TOKEN`; alternativ OpenAI mit `OPENAI_API_KEY`. Ohne Roboter testen mit „Probelauf ohne Roboter“.
+  Der Server kennt weder Copilot noch OpenAI noch Bluetooth.
 
 ## Struktur
 
@@ -41,7 +41,7 @@ hebo-server/
 hebo-client/
   start.bat         fragt name:
   client.py         Suche, Anmeldung, Fenster; bei KI/AI startet er pilot.py
-  pilot.py          KI-Client: Copilot-Sitzung, Werkzeuge, Taktik-Regler, Bluetooth zum Roboter
+  pilot.py          KI-Client: Copilot- oder OpenAI-Sitzung, Werkzeuge, Taktik-Regler, Bluetooth zum Roboter
   tests/            pytest für pilot.py, ohne Copilot und Roboter
   web/              operator.html, stage.html (auch Spieler), common.js
   client.json       letzter Server, Tokens, KI-Vorgaben, nicht im Git

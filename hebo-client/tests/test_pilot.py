@@ -4,8 +4,11 @@
 import asyncio
 import base64
 import contextlib
+import io
+import json
 import math
 import time
+import urllib.error
 from types import SimpleNamespace
 
 import cv2
@@ -141,6 +144,7 @@ class FakeClient:
         self.sessions = []
 
     def __call__(self, token):
+        self.token = token
         return self
 
     async def start(self):
@@ -216,3 +220,65 @@ def test_kick_ends_the_pilot(monkeypatch):
     with pytest.raises(PilotError, match="Moderation"):
         asyncio.run(asyncio.wait_for(p.main(), 10))
     assert p.bt.key == STOP
+
+def test_runtime_install_retries_then_gives_up(monkeypatch):
+    monkeypatch.delenv("COPILOT_CLI_PATH", raising=False)
+    monkeypatch.setattr(pilot.time, "sleep", lambda _s: None)
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) < 2:
+            raise PermissionError("gesperrt")
+
+    pilot._ensure_runtime(flaky)
+    assert len(calls) == 2
+
+    def locked():
+        raise PermissionError("gesperrt")
+
+    with pytest.raises(PilotError, match="Virenscanner"):
+        pilot._ensure_runtime(locked)
+
+
+def test_openai_models_filter_and_effort(monkeypatch):
+    ids = ["gpt-4.1-mini", "gpt-4o-2024-08-06", "gpt-5", "gpt-4o-realtime-preview", "o4-mini", "o3-mini",
+           "text-embedding-3-small", "dall-e-3", "gpt-5-chat-latest"]
+
+    def urlopen(req, timeout):
+        assert req.full_url.endswith("/models")
+        assert req.get_header("Authorization") == "Bearer sk-test"
+        return io.BytesIO(json.dumps({"data": [{"id": i} for i in ids]}).encode())
+
+    monkeypatch.setattr(pilot.urllib.request, "urlopen", urlopen)
+    models = pilot._openai_models("sk-test")
+    assert [(m["id"], m["effort"]) for m in models] == [("gpt-4.1-mini", None), ("gpt-5", "low"),
+                                                         ("o4-mini", "low")]
+
+
+def test_openai_rejects_bad_key(monkeypatch):
+    def urlopen(req, timeout):
+        raise urllib.error.HTTPError(req.full_url, 401, "Unauthorized", None, None)
+
+    monkeypatch.setattr(pilot.urllib.request, "urlopen", urlopen)
+    with pytest.raises(PilotError, match="lehnt den Schlüssel ab"):
+        pilot._openai_models("sk-falsch")
+
+
+def test_openai_key_reaches_session_without_github(monkeypatch):
+    fake = FakeClient(script=[("set_tactic", {"tactic": "push_out", "side": "left"})])
+    p, _posts = make_pilot(fake, monkeypatch)
+    p.cfg = Setup("gpt-4.1-mini", "gpt-4.1-mini", None, "taktik", "", "", turn_s=0.05, api_key="sk-test")
+
+    async def scenario():
+        task = asyncio.create_task(p.main())
+        await until(lambda: fake.turns)
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+    asyncio.run(scenario())
+    assert fake.token is None
+    provider = fake.sessions[0]["provider"]
+    assert provider["type"] == "openai" and provider["api_key"] == "sk-test"
+    assert "reasoning_effort" not in fake.sessions[0]

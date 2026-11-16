@@ -29,8 +29,8 @@ KI-PCs ergeben „KI gegen KI“. Sind beide Plätze belegt, bekommt der KI-Clie
 Spielerplätze sind belegt“. Die Moderation nimmt eine KI wie jeden Spieler mit „Entfernen“
 vom Platz; der KI-Client hält dann seinen Roboter an und beendet sich.
 
-Der KI-PC verbindet sich selbst per Bluetooth mit seinem Roboter und bei GitHub Copilot;
-der Server-PC braucht dafür weder Copilot noch Bluetooth. Die KI wartet auf den Kampf;
+Der KI-PC verbindet sich selbst per Bluetooth mit seinem Roboter und bei GitHub Copilot
+oder OpenAI; der Server-PC braucht dafür weder KI-Zugang noch Bluetooth. Die KI wartet auf den Kampf;
 außerhalb von `fight` hält sie ihren Roboter an. Registriert wird ihr Roboter wie jeder
 andere in Schritt 2.
 

@@ -26,15 +26,26 @@ verbindet.
 
 ## KI-Client
 
-Ein eigener PC lässt ein GitHub-Copilot-Modell seinen Roboter fahren. Er öffnet kein Fenster,
+Ein eigener PC lässt ein KI-Modell seinen Roboter fahren. Er öffnet kein Fenster,
 alles läuft in der Konsole:
 
-1. Nach `name: KI` prüft er die Copilot-Anmeldung dieses PCs (Copilot-CLI: `copilot`, dann
-   `/login`, oder eine der Variablen `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`).
-   Klappt das nicht, fragt er verdeckt nach einem Token (`github_pat_…` oder `gho_…`;
-   klassische `ghp_…` gehen nicht); leer bricht ab.
-2. Er fragt nacheinander mit Nummernauswahl: Modell (nur Modelle mit Bildverständnis, mit
-   Premium-Faktor „×n“), Steuerung „taktik“ (empfohlen: die KI wählt ein Manöver, ein
+1. Nach `name: KI` fragt er „Womit soll die KI denken?“: „GitHub Copilot“ (über das
+   Copilot-Abo) oder „OpenAI“ (eigener API-Schlüssel, Abrechnung pro Aufruf). Vorgabe ist die
+   Wahl vom letzten Mal, beim ersten Mal OpenAI, wenn `OPENAI_API_KEY` gesetzt ist.
+   * **Copilot:** Er prüft die Copilot-Anmeldung dieses PCs (Copilot-CLI: `copilot`, dann
+     `/login`, oder eine der Variablen `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`).
+     Klappt das nicht, fragt er verdeckt nach einem Token (`github_pat_…` oder `gho_…`;
+     klassische `ghp_…` gehen nicht); leer bricht ab.
+   * **OpenAI:** Er nimmt `OPENAI_API_KEY` oder fragt verdeckt nach dem Schlüssel (`sk-…`)
+     und prüft ihn kostenlos über die Modellliste von OpenAI. Lehnt OpenAI ihn ab, fragt er
+     erneut; leer bricht ab. Der Schlüssel wird nie gespeichert.
+   Beim ersten Start lädt das Copilot-SDK seine Laufzeit nach `%LOCALAPPDATA%\github-copilot-sdk`.
+   Sperrt der Virenscanner die frischen Dateien, versucht er es bis zu dreimal; danach meldet er,
+   den Ordner vom Scanner auszunehmen, und fragt wieder nach dem Namen.
+2. Er fragt nacheinander mit Nummernauswahl: Modell (nur Modelle mit Bildverständnis; bei
+   Copilot mit Premium-Faktor „×n“, bei OpenAI die Familien GPT-4o, GPT-4.1, GPT-5 und neuer
+   sowie o4 und neuer, ohne Sprach-, Bild-, Such-, Codex- und Pro-Varianten; Vorgabe beim
+   ersten Mal `gpt-4.1-mini`), Steuerung „taktik“ (empfohlen: die KI wählt ein Manöver, ein
    Regler auf dem KI-PC fährt es) oder „direkt“ (die KI drückt die Tasten selbst), und den
    Roboter aus den per Bluetooth gefundenen `hebobot…`, „Erneut suchen“ oder „Probelauf ohne
    Roboter“ (Tasten nur in der Konsole). Enter nimmt die Vorgabe vom letzten Mal aus `client.json`.

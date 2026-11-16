@@ -100,7 +100,7 @@ cd ..\hebo-client; python -m uv sync
 
 # Server: nur Konsole, kein Fenster
 cd hebo-server; .venv\Scripts\python -m hebocon --camera 0
-# Client: fragt nach name: (stage, mod, KI oder Spielername; KI = Copilot fährt den Roboter)
+# Client: fragt nach name: (stage, mod, KI oder Spielername; KI = Copilot oder OpenAI fährt den Roboter)
 cd hebo-client; .venv\Scripts\python client.py --server <LAN-IP aus der Server-Konsole>
 
 # Prüfen (im Ordner hebo-server)

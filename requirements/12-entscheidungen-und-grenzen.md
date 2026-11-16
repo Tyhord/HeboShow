@@ -145,7 +145,8 @@ denselben WebSocket wie bei der Bühne; die rund 50–100 ms im LAN sind neben e
 Sekunden je Modellantwort unerheblich. Die KI ändert das Spiel nur über dieselben Aktionen
 wie ein Mensch (`ulti`, dazu `say`), der Server prüft sie gleich, damit sie keine Regel
 umgehen kann. Ihren Zustand meldet sie mit `ai_status`, die Bedienung zeigt ihn nur an. Angebunden über das `github-copilot-sdk`, damit das vorhandene Copilot-Abo reicht und
-kein eigener API-Schlüssel nötig ist. Die KI bekommt nur ihre eigenen Werkzeuge, keine
+kein eigener API-Schlüssel nötig ist. Wer kein Copilot hat, gibt einen OpenAI-Schlüssel an;
+dasselbe SDK schickt dann direkt an OpenAI, Werkzeuge und Ablauf bleiben gleich. Die KI bekommt nur ihre eigenen Werkzeuge, keine
 Shell und keine Dateien.
 
 **Taktik-Steuerung als Standard.**
@@ -194,9 +195,12 @@ wohin er sich bei Vorwärtsfahrt bewegt; so braucht es keinen Marker auf dem Rob
   Tokens sind im Netz mitlesbar. Nicht ins Internet freigeben.
 * **Höchstens zwei Spieler.** Ein dritter Name bekommt „Beide Spielerplätze sind belegt“
   und kann als Bühne zuschauen. Eine KI zählt als Spieler.
-* **KI braucht Internet und ein Copilot-Abo.** Jede Anfrage mit Bild zählt als
-  Premium-Anfrage mit dem Faktor des Modells; `max_calls` in `client.json` begrenzt sie je Kampf.
-  Klassische Tokens (`ghp_…`) nimmt Copilot nicht an.
+* **KI braucht Internet und ein Copilot-Abo oder einen OpenAI-Schlüssel.** Bei Copilot zählt
+  jede Anfrage mit Bild als Premium-Anfrage mit dem Faktor des Modells, bei OpenAI kostet sie
+  Geld nach Verbrauch (ein ChatGPT-Abo enthält keinen API-Zugang); `max_calls` in
+  `client.json` begrenzt sie je Kampf. Klassische Tokens (`ghp_…`) nimmt Copilot nicht an.
+* **OpenAI-Modellliste geraten.** OpenAI sagt nicht, welches Modell Bilder versteht; der
+  Client filtert nach Namen. Ein neues Modell mit anderem Namensmuster fehlt in der Auswahl.
 * **KI ist langsam.** Ein bis drei Sekunden je Entscheidung; auf schnelle Wendungen
   reagiert nur der Regler der Taktik-Steuerung.
 * **Bluetooth-Abbruch:** Die Firmware fährt mit dem letzten Befehl weiter, bis wieder ein

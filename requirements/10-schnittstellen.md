@@ -184,9 +184,12 @@ Gerät (Name beginnt mit `hebobot`) und schreibt ein Zeichen in die Characterist
 Die Firmware hält den letzten Befehl, bis ein neuer kommt; der KI-Client schickt deshalb nur
 Wechsel und am Ende immer einen Stopp.
 
-## Copilot (KI-Client)
+## KI-Modell (KI-Client)
 
-Der KI-Client spricht über das Paket `github-copilot-sdk` mit GitHub Copilot. Er liest
+Der KI-Client spricht über das Paket `github-copilot-sdk` mit GitHub Copilot oder, mit eigenem
+Schlüssel, über dessen Provider-Anbindung direkt mit OpenAI (`https://api.openai.com/v1`,
+Chat Completions; GitHub-Anmeldung dabei aus). Denkende Modelle (GPT-5 und neuer, o-Reihe)
+bekommen den Denkaufwand „low“. Den Schlüssel prüft er vorab mit `GET /v1/models`. Er liest
 `/ws?token=…&frames=1`, braucht also das entzerrte Arenabild. Je Runde geht ein JPEG der
 Arena (eigener Roboter grün „DU“ mit Pfeil für die Fahrtrichtung, Gegner rot „GEGNER“,
 Rand weiß, Zone orange, Objekte als Kreise) und ein kurzer Lagetext an das Modell. Das Modell antwortet
