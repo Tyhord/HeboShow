@@ -39,18 +39,13 @@ setzen. Vorlage: [`../hebo-server/.env.example`](../hebo-server/.env.example). N
 | `HEBOCON_FOREGROUND_THRESHOLD` | `18` | Kleiner = empfindlicher, größer = weniger Rauschen |
 | `HEBOCON_MIN_ROBOT_AREA_PX` | `400` | Kleinere Klumpen werden ignoriert |
 
-## KI-Pilot
+## KI
 
-Siehe Reiter „🧠 KI“ in [04-bedienung.md](04-bedienung.md).
+Die KI läuft im Client auf einem eigenen PC (siehe „KI-Client“ in
+[04-bedienung.md](04-bedienung.md) und unten unter „Client“). Im Server gibt es nur:
 
 | Variable | Standard | Wirkung |
 | --- | --- | --- |
-| `HEBOCON_AI_GITHUB_TOKEN` | leer | Leer = Anmeldung der Copilot-CLI auf dem Server-PC. Sonst ein fein granulares Token (`github_pat_…`) oder OAuth-Token (`gho_…`, `ghu_…`) mit Copilot-Zugang; klassische `ghp_…`-Tokens gehen nicht |
-| `HEBOCON_AI_TURN_S` | `1.5` | Mindestabstand zwischen zwei Bildern ans Modell in Sekunden; kürzer kostet mehr Anfragen |
-| `HEBOCON_AI_IMAGE_PX` | `512` | Kantenlänge des Bildes ans Modell |
-| `HEBOCON_AI_MAX_CALLS` | `200` | Höchstzahl Modellanfragen je Pilot und Kampf; danach bleibt der Roboter stehen |
-| `HEBOCON_AI_DRY_RUN` | `false` | `true` = ohne Roboter testen, Fahrbefehle stehen nur in der Konsole |
-| `HEBOCON_AI_ROBOT_PREFIX` | `hebobot #` | Bluetooth-Name des Roboters vor der Platznummer, wenn im Reiter keiner eingetragen ist. In der `.env` in Anführungszeichen, sonst gilt `#` als Kommentar |
 | `HEBOCON_SAY_S` | `4` | So lange steht eine Sprechblase auf der Bühne (Sekunden) |
 
 ## Spielregeln
@@ -99,3 +94,5 @@ vor `.env` und Standard. „↺ Standardwerte“ löscht die Datei, danach gilt 
 | `client.json` → `server` | Zuletzt erfolgreich benutzter Server, wird automatisch gepflegt |
 | `client.json` → `tokens` | Anmeldung je Server und Rolle, damit ein Spieler seinen Platz zurückbekommt |
 | `client.json` → `stage_fullscreen` | `true` öffnet die Bühne im Vollbild (Standard `false`) |
+| `client.json` → `ai` | Vorgaben des KI-Clients: `model`, `steering` (`taktik`/`direkt`), `robot` (Bluetooth-Name, leer = Probelauf) werden bei jeder Anmeldung abgefragt und gemerkt. Nur hier einstellbar: `turn_s` (`1.5`, Mindestabstand zwischen zwei Bildern ans Modell in Sekunden), `max_calls` (`200`, Modellanfragen je Kampf, danach bleibt der Roboter stehen), `image_px` (`512`, Kantenlänge des Bildes ans Modell) |
+| `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN` | Copilot-Token für den KI-Client, in dieser Reihenfolge; fein granular (`github_pat_…`) oder OAuth (`gho_…`, `ghu_…`), klassische `ghp_…` gehen nicht. Ohne Variable gilt die Anmeldung der Copilot-CLI auf dem KI-PC, sonst fragt der Client |

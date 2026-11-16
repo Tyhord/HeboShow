@@ -100,12 +100,14 @@ cd ..\hebo-client; python -m uv sync
 
 # Server: nur Konsole, kein Fenster
 cd hebo-server; .venv\Scripts\python -m hebocon --camera 0
-# Client: fragt nach name: (stage, mod oder Spielername)
+# Client: fragt nach name: (stage, mod, KI oder Spielername; KI = Copilot fährt den Roboter)
 cd hebo-client; .venv\Scripts\python client.py --server <LAN-IP aus der Server-Konsole>
 
 # Prüfen (im Ordner hebo-server)
 .venv\Scripts\python -m pytest -q
-.venv\Scripts\python -m ruff check hebocon tests ..\hebo-client\client.py
+.venv\Scripts\python -m ruff check hebocon tests ..\hebo-client\client.py ..\hebo-client\pilot.py ..\hebo-client\tests
+# KI-Client-Tests (im Ordner hebo-client)
+.venv\Scripts\python -m pytest -q
 ```
 
 Details in [`agents/02-pruefen.md`](agents/02-pruefen.md).

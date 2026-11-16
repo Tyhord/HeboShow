@@ -2,7 +2,7 @@
 """Hebocon-Client: findet den Server im LAN, meldet sich mit Namen an und öffnet die passenden Fenster.
 
 Der Client hat kein eigenes Spiel. Er liefert nur die Seiten aus web/ lokal aus; Zustand, Aktionen und
-Medien kommen vom Server.
+Medien kommen vom Server. Mit dem Namen „KI“ fährt stattdessen ein Copilot-Modell (pilot.py).
 """
 
 import argparse
@@ -26,6 +26,8 @@ CONFIG = ROOT / "client.json"
 DEFAULT_PORT = 8765
 DISCOVERY_PORT = 8766
 MAGIC = b"HEBOCON?"
+# Mit diesem Namen wird der PC zum KI-Spieler (siehe pilot.py) statt Fenster zu öffnen.
+AI_NAMES = ("ai", "ki")
 
 
 # ---------- Einstellungen ----------
@@ -166,6 +168,7 @@ def find_server(cfg: dict, forced: str | None) -> tuple[str, str]:
 
 def login(server: str, server_id: str, cfg: dict) -> dict:
     tokens = cfg.setdefault("tokens", {}).setdefault(server_id, {})
+    ai = None
     while True:
         name = input("name: ").strip()
         if not name:
@@ -175,6 +178,18 @@ def login(server: str, server_id: str, cfg: dict) -> dict:
         data = {"name": name, "token": tokens.get(role_key, "")}
         if role_key == "moderator":
             data["password"] = getpass.getpass("Passwort: ")
+        elif key in AI_NAMES:
+            # Erst einrichten: der Server zeigt das gewählte Modell als Spielernamen.
+            import pilot
+
+            try:
+                ai = ai or pilot.setup(cfg)
+            except pilot.PilotError as exc:
+                print(exc)
+                continue
+            save_config(cfg)
+            role_key = "ki"
+            data = {"name": "KI", "token": tokens.get(role_key, ""), "model": ai.label}
         try:
             result = http_json(server, "/lobby/join", data)
         except (OSError, ValueError):
@@ -182,9 +197,11 @@ def login(server: str, server_id: str, cfg: dict) -> dict:
             continue
         if result.get("ok"):
             tokens[role_key] = result["token"]
+            if result.get("ai"):
+                result["pilot"] = ai
             return result
         print(result.get("message", "Anmeldung abgelehnt."))
-        if result.get("code") != "full":
+        if result.get("code") != "full" or key in AI_NAMES:
             continue
         if input("Stattdessen als Bühne verbinden? (j/n) ").strip().lower() == "j":
             result = http_json(server, "/lobby/join", {"name": "stage", "token": tokens.get("stage", "")})
@@ -226,6 +243,24 @@ def watch(server: str, stop: threading.Event) -> None:
 
 # ---------- Start ----------
 
+def run_ai(server: str, result: dict) -> None:
+    import pilot
+
+    print(f"Angemeldet als KI-Spieler {result['slot']}: {result['name']}")
+    try:
+        pilot.run(server, result, result["pilot"])
+    except pilot.PilotError as exc:
+        print(exc)
+    except KeyboardInterrupt:
+        print("KI beendet, Roboter angehalten.")
+    finally:
+        try:
+            http_json(server, "/lobby/leave", {}, token=result["token"], timeout=2.0)
+            print("Spielerplatz freigegeben.")
+        except (OSError, ValueError):
+            pass
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="hebo-client")
     parser.add_argument("--server", help="Server-Adresse (IP oder IP:Port) statt automatischer Suche")
@@ -241,6 +276,9 @@ def main() -> None:
     result = login(server, server_id, cfg)
     save_config(cfg)
     role = result["role"]
+    if result.get("ai"):
+        run_ai(server, result)
+        return
     if role == "player":
         print(f"Angemeldet als Spieler {result['slot']}: {result['name']}")
     else:

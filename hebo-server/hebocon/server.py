@@ -82,14 +82,15 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
         data = await request.json() if await request.body() else {}
         try:
             result = await asyncio.to_thread(lobby.join, data.get("name", ""), data.get("password", ""),
-                                             data.get("token", ""))
+                                             data.get("token", ""), data.get("model", ""))
         except LobbyError as exc:
             log.warning("Anmeldung „%s“ abgelehnt: %s", data.get("name", ""), exc)
             return JSONResponse({"ok": False, "code": exc.code, "message": str(exc)}, status_code=400)
         client = request.client.host if request.client else "?"
         if result["role"] == "player":
             app.player_joined(result["slot"], result["name"])
-            log.info("Spieler %d „%s“ angemeldet (%s).", result["slot"], result["name"], client)
+            log.info("%s %d „%s“ angemeldet (%s).", "KI" if result.get("ai") else "Spieler", result["slot"],
+                     result["name"], client)
         else:
             log.info("%s angemeldet (%s).", ROLE_LABEL[result["role"]], client)
         return JSONResponse({"ok": True, **result})
@@ -108,15 +109,19 @@ def create_server(app: App, media_dir: Path = MEDIA_DIR, lobby: Lobby | None = N
         data = await request.json() if await request.body() else {}
         session = who(request)[1]
         role = session["role"] if session else None
-        # Bühnen und Spieler melden nur das Ende ihrer Medien; Spieler zünden außerdem ihre eigene Ulti.
-        if role == "player" and name == "ulti":
+        # Bühnen und Spieler melden nur das Ende ihrer Medien; Spieler zünden außerdem ihre eigene Ulti,
+        # KI-Clients sprechen und melden ihren Status – immer nur für den eigenen Platz.
+        own = ("ulti", "say", "ai_status") if session and session.get("ai") else ("ulti",)
+        if role == "player" and name in own:
             if not session["slot"]:
                 return JSONResponse({"ok": False, "message": "Du hast gerade keinen Spielerplatz."},
                                     status_code=403)
-            data = {"player": session["slot"]}
+            data = {**data, "player": session["slot"]} if name != "ulti" else {"player": session["slot"]}
         elif not (role == "moderator" or (role and name == "cue" and data.get("kind") == "ended")):
             return denied(session)
-        if not (name == "cue" and data.get("kind") == "ended"):
+        # Die Statusmeldungen der KI kommen alle paar Sekunden und würden das Log fluten.
+        quiet = name == "ai_status" or (name == "cue" and data.get("kind") == "ended")
+        if not quiet:
             log.info("Aktion %s von %s", name, lobby.describe(who(request)[0]))
         try:
             await asyncio.to_thread(app.act, name, data)

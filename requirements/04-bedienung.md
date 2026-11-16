@@ -17,11 +17,31 @@ verbindet.
 1. `hebo-client\start.bat` sucht den Server im LAN. Findet sie keinen, nimmt sie den
    zuletzt benutzten oder fragt nach der IP („Server-IP:“).
 2. Sie fragt `name:`. `stage` → Bühne. `mod`/`moderator` → „Passwort:“ (verdeckt), bei
-   falschem Passwort erneut. Jeder andere Name → Spieler.
+   falschem Passwort erneut. `KI`/`AI` → KI-Client (siehe unten). Jeder andere Name →
+   Spieler; Namen, die mit `ki:` beginnen, sind gesperrt.
 3. Ist der Name schon auf einem anderen Gerät aktiv, fragt sie nach einem anderen. Sind
-   beide Plätze belegt, fragt sie „Stattdessen als Bühne verbinden? (j/n)“.
+   beide Plätze belegt, fragt sie „Stattdessen als Bühne verbinden? (j/n)“ (nicht beim KI-Client).
 4. Die Konsole bleibt offen und meldet, wenn die Verbindung abreißt und wiederkommt.
    Schließen der Fenster beendet den Client; ein Spieler gibt dabei seinen Platz frei.
+
+## KI-Client
+
+Ein eigener PC lässt ein GitHub-Copilot-Modell seinen Roboter fahren. Er öffnet kein Fenster,
+alles läuft in der Konsole:
+
+1. Nach `name: KI` prüft er die Copilot-Anmeldung dieses PCs (Copilot-CLI: `copilot`, dann
+   `/login`, oder eine der Variablen `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`).
+   Klappt das nicht, fragt er verdeckt nach einem Token (`github_pat_…` oder `gho_…`;
+   klassische `ghp_…` gehen nicht); leer bricht ab.
+2. Er fragt nacheinander mit Nummernauswahl: Modell (nur Modelle mit Bildverständnis, mit
+   Premium-Faktor „×n“), Steuerung „taktik“ (empfohlen: die KI wählt ein Manöver, ein
+   Regler auf dem KI-PC fährt es) oder „direkt“ (die KI drückt die Tasten selbst), und den
+   Roboter aus den per Bluetooth gefundenen `hebobot…`, „Erneut suchen“ oder „Probelauf ohne
+   Roboter“ (Tasten nur in der Konsole). Enter nimmt die Vorgabe vom letzten Mal aus `client.json`.
+3. Danach meldet er sich als Spieler an und schreibt Verbindungen, Taktikwechsel, Sprüche
+   und Kommentare der KI in die Konsole. Strg+C hält den Roboter an und gibt den Platz frei.
+4. Reißt die Verbindung zum Server ab, hält der Roboter nach spätestens 1 s an; der Client
+   verbindet sich von selbst neu. Wird die KI von der Moderation entfernt, beendet er sich.
 
 ## Bedienung
 
@@ -122,7 +142,7 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
 * Freigestellte Memes erscheinen auf der Bühne ohne Rahmen, Schatten oder Hintergrund und
   laufen bis zu ihrem Ende, auch über 30 s.
 
-**Rechts: Einstellungen** mit Reitern „📷 Kamera · 🔳 Spielfeld · 🤖 Roboter · ⚖ Balancing · 🧠 KI“.
+**Rechts: Einstellungen** mit Reitern „📷 Kamera · 🔳 Spielfeld · 🤖 Roboter · ⚖ Balancing“.
 Der Reiter folgt dem Ablauf (keine Kamera → Kamera, Kalibrierung → Spielfeld, Registrierung
 → Roboter, sonst Kamera mit dem Technik-Status). Ein Klick zeigt einen anderen Reiter, bis der Ablauf
 weiterspringt. Über den Reitern stehen:
@@ -142,8 +162,10 @@ Darunter je Reiter:
   über ▶ links (erst aktiv, wenn beide erkannt sind) oder Enter im Namensfeld.
   Darunter „Spieler im LAN“: je belegtem Platz Nummer, Name, ein Punkt für online/offline
   und „Entfernen“ (nach Rückfrage wird der Platz frei, der Name bleibt gespeichert), dazu
-  wie viele Bühnen, Moderationen und Spieler verbunden sind. KI-Plätze tragen ein 🤖 vor
-  dem Namen und haben kein „Entfernen“; sie gibt man im Reiter KI frei.
+  wie viele Bühnen, Moderationen und Spieler verbunden sind. KI-Clients tragen ein 🤖 vor
+  dem Namen; darunter steht nur lesend, was der KI-PC meldet: Status, Fehler, Modell,
+  Steuerung, Roboter mit Bluetooth-Zustand, Taktik, Taste, „Anfragen: x / y“ und der
+  letzte Kommentar der KI. „Entfernen“ nimmt auch eine KI vom Platz.
 * **Balancing**: alle Spielregel-Werte aus [02-spielregeln.md](02-spielregeln.md) als
   Zahlenfelder mit Einheit, gruppiert nach Lebenspunkte, Ringout, Kollision, Hindernis,
   Power-up, Laser-Ulti und Schrumpfende Arena. Anteile stehen in Prozent, Strecken in
@@ -151,22 +173,6 @@ Darunter je Reiter:
   gedrückt wird, sofort auch im laufenden Kampf, und bleibt nach einem Neustart erhalten.
   Ungültige Werte springen zurück, das Feld wird kurz rot umrandet und die Meldung sagt,
   welcher Bereich erlaubt ist. „↺ Standardwerte“ setzt nach Rückfrage alles zurück.
-* **KI**: lässt ein Copilot-Modell einen Roboter fahren (Ablauf in
-  [03-match-ablauf.md](03-match-ablauf.md)).
-  * „Wer kämpft?“: Mensch gegen Mensch, Mensch gegen KI (KI auf Platz 2) oder KI gegen KI.
-    Im Kampf gesperrt.
-  * „GitHub Copilot“: zeigt, als wer der Server angemeldet ist und wie viele Modelle Bilder
-    verstehen, sonst den Fehler mit dem nächsten Schritt. „Anmeldung & Modelle laden“
-    prüft erneut. Angemeldet wird einmal auf dem Server-PC: `copilot` starten und
-    `/login`, oder `HEBOCON_AI_GITHUB_TOKEN` setzen. Läuft der Server im Probelauf
-    (`HEBOCON_AI_DRY_RUN`), steht hier ein Hinweis.
-  * Je Platz „KI auf Platz n“ (nur aktiv, wenn der Modus dort eine KI vorsieht): Modell
-    (nur Modelle mit Bildverständnis, mit Premium-Faktor „×n“), Steuerung „Taktik“
-    (empfohlen: die KI wählt ein Manöver, ein Regler im Server fährt es) oder „Direkt“ (die
-    KI drückt die Tasten selbst), Bluetooth-Name des Roboters (leer = `hebobot #n`).
-    „Übernehmen“ speichert und startet die KI neu, „Verbinden“ verbindet neu, auch im Kampf,
-    etwa nach einem Bluetooth-Abbruch. Darunter Status, Fehler, aktuelle Taktik und Taste,
-    „Anfragen: x / y“ und der letzte Kommentar der KI.
 
 Im Bild:
 

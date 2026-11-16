@@ -22,17 +22,17 @@ Roboternamen auf allen Bildschirmen. Meldet sich jemand während eines Kampfs an
 gilt der Name ab dem nächsten Kampf. Ohne angemeldete Spieler läuft alles wie bisher, die
 Moderation trägt die Namen selbst ein.
 
-Statt eines Menschen kann eine KI kämpfen (Reiter „🧠 KI“, siehe [04-bedienung.md](04-bedienung.md)):
-„Mensch gegen KI“ gibt Platz 2 an die KI, „KI gegen KI“ beide Plätze. Die KI belegt den
-Spielerplatz wie ein Spieler und heißt „KI · Modellname“. Sitzt dort schon ein Spieler,
-rückt er auf den freien Platz; ist keiner frei, verliert er seinen Platz. Neue Spieler
-bekommen dann „Beide Spielerplätze sind belegt“. Zurück auf „Mensch gegen Mensch“ heißen
-die frei gewordenen Plätze wieder „Roboter 1/2“. Modus und Modell lassen sich nur außerhalb
-des Kampfs (`intro` bis `fight`) ändern; KI-Plätze überleben keinen Neustart des Servers.
+Statt eines Menschen kann eine KI kämpfen: ein eigener PC mit dem Client meldet sich mit
+dem Namen `KI` (oder `AI`) an (siehe „KI-Client“ in [04-bedienung.md](04-bedienung.md)).
+Er belegt den ersten freien Spielerplatz wie ein Spieler und heißt „KI · Modellname“. Zwei
+KI-PCs ergeben „KI gegen KI“. Sind beide Plätze belegt, bekommt der KI-Client „Beide
+Spielerplätze sind belegt“. Die Moderation nimmt eine KI wie jeden Spieler mit „Entfernen“
+vom Platz; der KI-Client hält dann seinen Roboter an und beendet sich.
 
-Die KI verbindet sich beim Einschalten per Bluetooth mit ihrem Roboter und bei GitHub
-Copilot. Sie wartet dann auf den Kampf; außerhalb von `fight` hält sie ihren Roboter an.
-Registriert wird ihr Roboter wie jeder andere in Schritt 2.
+Der KI-PC verbindet sich selbst per Bluetooth mit seinem Roboter und bei GitHub Copilot;
+der Server-PC braucht dafür weder Copilot noch Bluetooth. Die KI wartet auf den Kampf;
+außerhalb von `fight` hält sie ihren Roboter an. Registriert wird ihr Roboter wie jeder
+andere in Schritt 2.
 
 ## 1. Arena einrichten (einmal pro Sitzung)
 

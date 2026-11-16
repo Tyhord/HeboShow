@@ -6,7 +6,13 @@ version = "2.0.0"
 description = "Hebocon Battle Vision Client: Bühne, Bedienung und Spieleransicht im LAN"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "bleak>=3.1.0",
+    "github-copilot-sdk>=1.0.34",
+    "numpy>=2.5.5",
+    "opencv-python-headless>=5.0.0.93",
+    "pydantic>=2.14.3",
     "pywebview>=5.3",
+    "websockets>=17.4",
 ]
 
 # Nur ein Starter-Skript, kein installierbares Paket.
@@ -19,3 +25,12 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]

@@ -10,8 +10,8 @@ Alles im Ordner `hebo-server`:
 # Tests: Regeln, Arena, Tracking, Lobby, kompletter Ablauf mit Fake-Kamera
 .venv\Scripts\python -m pytest -q
 
-# Lint (Server und Client-Launcher)
-.venv\Scripts\python -m ruff check hebocon tests ..\hebo-client\client.py
+# Lint (Server und Client)
+.venv\Scripts\python -m ruff check hebocon tests ..\hebo-client\client.py ..\hebo-client\pilot.py ..\hebo-client\tests
 
 # Import und Start (nur Konsole)
 .venv\Scripts\python -c "import hebocon.server; print('ok')"
@@ -21,7 +21,10 @@ Alles im Ordner `hebo-server`:
 Client danach im Ordner `hebo-client`: `.venv\Scripts\python client.py` (findet den Server
 selbst) oder `--server <LAN-IP aus der Server-Konsole>`; `127.0.0.1` geht nicht, der Server
 lauscht nur auf dem gewählten Adapter.
-Für Rollen-Tests mehrere Clients starten (`stage`, `mod`, zwei Spielernamen).
+Für Rollen-Tests mehrere Clients starten (`stage`, `mod`, zwei Spielernamen, `KI`).
+
+KI-Client-Tests im Ordner `hebo-client` (ohne Copilot und Roboter):
+`.venv\Scripts\python -m pytest -q`
 
 Die Tests brauchen weder echtes Modell noch Kamera. Der Ablauf läuft zweimal: ohne Modell
 und mit einem Fake-EdgeTAM. Auf Windows meldet pytest eine „access violation“ beim Import
@@ -38,7 +41,7 @@ Mit einem Testvideo oder echter Kamera:
 
 ## Checkliste vor dem Abschluss
 
-- [ ] `pytest` grün
+- [ ] `pytest` grün (Server, bei Änderungen an `pilot.py` auch Client)
 - [ ] `ruff` sauber
 - [ ] Passende Datei in `requirements/` angepasst
 - [ ] Neue `HEBOCON_`-Variable auch in `.env.example`

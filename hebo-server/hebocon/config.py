@@ -62,16 +62,6 @@ class Settings(BaseSettings):
 
     # So lange steht eine Sprechblase der KI auf der Bühne.
     say_s: float = 4.0
-    # KI-Pilot (Reiter „KI“): Abstand zwischen zwei Bildern ans Modell; kürzer kostet mehr Anfragen.
-    ai_turn_s: float = 1.5
-    ai_image_px: int = 512
-    # Obergrenze an Modellanfragen je Pilot und Kampf, damit ein Abend das Copilot-Kontingent nicht leert.
-    ai_max_calls: int = 200
-    # Leer = Anmeldung der Copilot-CLI auf diesem Rechner nutzen.
-    ai_github_token: str = ""
-    # Ohne Roboter testen: Fahrbefehle landen nur in der Konsole.
-    ai_dry_run: bool = False
-    ai_robot_prefix: str = "hebobot #"
 
 
 # Live änderbare Spielwerte (Reiter „Balancing“) mit erlaubtem Bereich; Grenzen verhindern,

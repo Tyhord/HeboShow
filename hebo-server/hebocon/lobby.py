@@ -16,6 +16,8 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 RESERVED = ("stage", "mod", "moderator")
+# Mit diesem Namen meldet sich ein KI-Client an; er bekommt einen Spielerplatz wie ein Mensch.
+AI_NAMES = ("ai", "ki")
 MAX_NAME = 24
 ROLE_LABEL = {"stage": "Bühne", "moderator": "Moderation", "player": "Spieler"}
 
@@ -38,14 +40,12 @@ class Lobby:
         # name.lower() → {"name", "token", "slot"}; slot None heißt: bekannt, aber gerade nicht im Spiel.
         self.players: dict[str, dict] = {}
         self.online: dict[str, int] = {}
-        # Platz → Anzeigename des KI-Piloten; nur im Speicher, nach einem Neustart steuern wieder Menschen.
-        self.ai: dict[int, str] = {}
         self._lock = threading.Lock()
         self._load()
 
     # ---------- Anmeldung ----------
 
-    def join(self, name: str, password: str = "", token: str = "") -> dict:
+    def join(self, name: str, password: str = "", token: str = "", model: str = "") -> dict:
         name = str(name or "").strip()
         key = name.lower()
         with self._lock:
@@ -59,6 +59,12 @@ class Lobby:
                     raise LobbyError("Falsches Passwort.", "password")
                 token = self._session(token, "moderator", "moderator")
                 result = {"role": "moderator", "name": "moderator", "slot": None}
+            elif key in AI_NAMES:
+                token, slot = self._join_ai(model, token)
+                result = {"role": "player", "name": self.players[f"ki:{slot}"]["name"], "slot": slot,
+                          "ai": True}
+            elif key.startswith("ki:"):
+                raise LobbyError("Dieser Name ist für KI-Clients reserviert.")
             else:
                 token, slot = self._join_player(name, key, token)
                 name = self.players[key]["name"]
@@ -81,8 +87,7 @@ class Lobby:
         if slot is None and renamed is not None:
             slot, renamed["slot"] = renamed["slot"], None
         if slot is None:
-            taken = {r["slot"] for r in self.players.values()} | set(self.ai)
-            slot = next((s for s in (1, 2) if s not in taken), None)
+            slot = self._free_slot()
         if slot is None:
             raise LobbyError("Beide Spielerplätze sind belegt.", "full")
         if not (token and self.sessions.get(token, {}).get("role") == "player"):
@@ -94,6 +99,30 @@ class Lobby:
         self.players[key] = {"name": name, "token": token, "slot": slot}
         self.sessions[token] = {"role": "player", "name": key}
         return token, slot
+
+    def _join_ai(self, model: str, token: str) -> tuple[str, int]:
+        # Eigener Schlüssel je Platz, damit zwei KI-Clients gleichzeitig „KI“ heißen dürfen.
+        mine = next((r for r in self.players.values() if r["slot"] and token and r["token"] == token), None)
+        slot = mine["slot"] if mine else self._free_slot()
+        if slot is None:
+            raise LobbyError("Beide Spielerplätze sind belegt.", "full")
+        if mine is not None and not mine.get("ai"):
+            mine["slot"] = None
+        if not (token and self.sessions.get(token, {}).get("role") == "player"):
+            token = secrets.token_urlsafe(18)
+        key = f"ki:{slot}"
+        old = self.players.get(key)
+        if old and old["token"] != token:
+            self.sessions.pop(old["token"], None)
+        model = " ".join(str(model or "").split())
+        name = f"KI · {model}"[:MAX_NAME] if model else "KI"
+        self.players[key] = {"name": name, "token": token, "slot": slot, "ai": True}
+        self.sessions[token] = {"role": "player", "name": key}
+        return token, slot
+
+    def _free_slot(self) -> int | None:
+        taken = {r["slot"] for r in self.players.values()}
+        return next((s for s in (1, 2) if s not in taken), None)
 
     def _session(self, token: str, role: str, name: str) -> str:
         if not (token and self.sessions.get(token, {}).get("role") == role):
@@ -120,23 +149,6 @@ class Lobby:
             self._save()
             return record["name"]
 
-    def reserve_ai(self, slot: int, name: str) -> tuple[str, int | None] | None:
-        """Platz für die KI belegen; ein Mensch dort rückt auf den anderen Platz oder verliert seinen."""
-        with self._lock:
-            self.ai[slot] = name
-            record = next((r for r in self.players.values() if r["slot"] == slot), None)
-            if record is None:
-                return None
-            other = 3 - slot
-            free = other not in self.ai and all(r["slot"] != other for r in self.players.values())
-            record["slot"] = other if free else None
-            self._save()
-            return record["name"], record["slot"]
-
-    def release_ai(self, slot: int) -> None:
-        with self._lock:
-            self.ai.pop(slot, None)
-
     # ---------- Abfragen ----------
 
     def session(self, token: str | None) -> dict | None:
@@ -149,7 +161,7 @@ class Lobby:
                 return dict(found)
             record = self._player(token)
             return {"role": "player", "name": record["name"] if record else found["name"],
-                    "slot": record["slot"] if record else None}
+                    "slot": record["slot"] if record else None, "ai": bool(record and record.get("ai"))}
 
     def describe(self, token: str | None) -> str:
         found = self.session(token)
@@ -170,9 +182,8 @@ class Lobby:
 
     def public(self) -> dict:
         with self._lock:
-            players = [{"slot": r["slot"], "name": r["name"], "online": r["token"] in self.online}
-                       for r in self.players.values() if r["slot"]]
-            players += [{"slot": s, "name": n, "online": True, "ai": True} for s, n in self.ai.items()]
+            players = [{"slot": r["slot"], "name": r["name"], "online": r["token"] in self.online,
+                        "ai": bool(r.get("ai"))} for r in self.players.values() if r["slot"]]
             counts = {"stage": 0, "moderator": 0, "player": 0}
             for token, n in self.online.items():
                 role = self.sessions.get(token, {}).get("role")
