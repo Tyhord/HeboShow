@@ -28,7 +28,7 @@ richtigen Server passen.
   `password` (`HEBOCON_MOD_PASSWORD`, nur auf dem Server). Jeder andere Name → `player`
   auf dem ersten freien Platz 1 oder 2, höchstens 24 Zeichen.
 * `code`: `password` (falsches Passwort), `taken` (Name spielt schon auf einem anderen
-  Gerät), `full` (beide Plätze belegt), `invalid` (sonst).
+  Gerät), `full` (beide Plätze belegt, auch durch die KI), `invalid` (sonst).
 * Wer sein altes `token` mitschickt, bekommt denselben Platz zurück. Ein neuer Name mit
   demselben Token benennt den Platz um, statt einen zweiten zu belegen.
 * Alle weiteren Anfragen tragen `Authorization: Bearer <token>`.
@@ -85,10 +85,16 @@ fehlendem Recht 403 und `{"ok": false, "message"}`.
 | `balancing` | `{"key": "<feld>", "value": zahl}` | Einen Balancing-Wert setzen (Felder wie in `balancing` im Zustand); gilt sofort und wird in `data/balancing.json` gespeichert. Unbekanntes Feld, keine Zahl oder außerhalb der Grenzen → 400. |
 | `balancing_reset` | – | Alle Balancing-Werte auf `.env`/Standard zurück, `data/balancing.json` wird gelöscht |
 | `name` | `{"player": 1 \| 2, "name"}` | Roboternamen setzen; im laufenden Kampf gilt er ab dem nächsten. Meldet sich der Spieler neu an, gilt wieder sein Lobby-Name. |
-| `kick` | `{"slot": 1 \| 2}` | Spieler vom Platz nehmen. Sein Name bleibt gespeichert, der Platz wird frei. |
+| `kick` | `{"slot": 1 \| 2}` | Spieler vom Platz nehmen. Sein Name bleibt gespeichert, der Platz wird frei. Plätze der KI lassen sich nicht entfernen (400). |
+| `say` | `{"player": 1 \| 2, "text"}` | Sprechblase über dem Roboter, `HEBOCON_SAY_S` Sekunden, höchstens 80 Zeichen; leerer Text löscht sie. Nutzt vor allem der KI-Pilot. |
+| `ai_probe` | – | Copilot-Anmeldung und Modellliste im Hintergrund neu prüfen |
+| `ai_mode` | `{"mode": "mensch" \| "mensch-ki" \| "ki-ki"}` | Wer spielt: KI auf Platz 2 bzw. auf beiden. Belegt die KI-Plätze, ein Mensch dort rückt auf den freien Platz oder verliert ihn. Nicht zwischen Start und Ende eines Kampfs. |
+| `ai_slot` | `{"slot", "model", "steering": "direkt" \| "taktik", "robot"}` | KI eines Platzes einstellen: Modell-ID aus `ai.models`, Steuerart, Bluetooth-Name (leer = `HEBOCON_AI_ROBOT_PREFIX` + Platz). Startet den Pilot neu, wenn der Platz gerade KI ist. Nicht im Kampf. |
+| `ai_connect` | `{"slot"}` | Pilot dieses Platzes neu verbinden (Bluetooth und Copilot); geht auch im Kampf |
 
 Während `busy` gesetzt ist, sind nur `camera`, `abort`, `spawn`, `shrink`, `hud`, `profile`,
-`cue`, `ko`, `ulti`, `balancing`, `balancing_reset`, `name` und `kick` erlaubt.
+`cue`, `ko`, `ulti`, `balancing`, `balancing_reset`, `name`, `kick`, `say` und die
+`ai_`-Aktionen erlaubt.
 
 ## WebSocket `/ws?token=<token>&frames=0|1`
 
@@ -130,13 +136,14 @@ Alle Koordinaten in **Pixeln des Originalbildes** (`frame.w` × `frame.h`).
 | `model` | EdgeTAM: `enabled`, `ready`, `error`, `device` (GPU-Name oder CPU), `corrections` (Identitäts-Korrekturen durch den Schiedsrichter) |
 | `arena` | `null` oder `corners`, `size` (Arena in Einheiten) |
 | `proposal` | in `register`: `slot`, `contour` der beiden erkannten Roboter |
-| `robots` | `id`, `name`, `present`, `hp`, `max_hp`, `outside`, `center`, `contour`, `ulti` (`charge` 0–1, `ready`, `used`) |
+| `robots` | `id`, `name`, `present`, `hp`, `max_hp`, `outside`, `center`, `contour`, `ulti` (`charge` 0–1, `ready`, `used`), `ai` (Platz wird von der KI gesteuert), `say` (Text der Sprechblase oder `null`) |
+| `ai` | `{"mode", "login": {"state": null \| "prüft" \| "ok" \| "fehlt" \| "fehler", "user", "error"}, "models": [{"id", "name", "multiplier", "effort"}], "slots": [{"slot", "active", "model", "steering", "robot", "status", "error", "calls", "comment", "tactic", "key"}], "dry_run", "max_calls"}`. `models` enthält nur freigeschaltete Modelle, die Bilder sehen. `comment` ist der letzte Satz des Modells, `key` die zuletzt gesendete Taste. |
 | `contact` | beide Roboter berühren sich gerade |
 | `items` | `id`, `kind`, `center`, `poly`, `armed`, `ttl` |
 | `shot` | `null` oder der zielende Laser: `player`, `from`, `to`, `left` (Sekunden bis zum Schuss), `aim` (Zieldauer) |
 | `zone` | `null` oder die 4 Eckpunkte der erlaubten Fläche, während die Arena schrumpft |
 | `balancing` | Aktuelle Spielregel-Werte, Schlüssel wie die `HEBOCON_`-Variablen ohne Präfix in Kleinbuchstaben (`start_hp`, `collision_damage`, …, `shrink_duration_s`) |
-| `lobby` | `{"players": [{"slot", "name", "online"}], "online": {"stage", "moderator", "player"}}`: belegte Spielerplätze und Zahl offener Verbindungen je Rolle |
+| `lobby` | `{"players": [{"slot", "name", "online", "ai"?}], "online": {"stage", "moderator", "player"}}`: belegte Spielerplätze und Zahl offener Verbindungen je Rolle; `ai: true` markiert einen Platz der KI |
 | `events` | die letzten 30 Ereignisse, siehe unten |
 | `winner` | Name des Siegers oder `null` |
 | `finished` | Kampf vorbei |
@@ -159,3 +166,29 @@ Jedes hat `id` (fortlaufend pro Kampf) und `type`. Die Bühne spielt jedes nur e
 | `ulti_fire` | `player` (Schütze), `hit`, `at` (Trefferpunkt oder `null`), `from`, `to` |
 | `ulti` | `player` (getroffen), `amount`, `pos` |
 | `ko` | `players` (auf 0), `winner` (id oder `null`) |
+
+## Roboter per Bluetooth (KI-Pilot)
+
+Nur für Plätze, die die KI steuert. Der Server verbindet sich per Bluetooth LE mit dem
+Gerät, dessen Name dem eingestellten `robot` entspricht (Standard `hebobot #1` bzw.
+`hebobot #2`), und schreibt ein Zeichen in die Characteristic
+`19B10001-E8F2-537E-4F6C-D104768A1214`:
+
+| Zeichen | Wirkung |
+| --- | --- |
+| `w` | vorwärts |
+| `s` | rückwärts |
+| `a` | auf der Stelle links drehen |
+| `d` | auf der Stelle rechts drehen |
+| Leerzeichen | Stopp |
+
+Die Firmware hält den letzten Befehl, bis ein neuer kommt; der Server schickt deshalb nur
+Wechsel und am Ende immer einen Stopp.
+
+## Copilot (KI-Pilot)
+
+Der Server spricht über das Paket `github-copilot-sdk` mit GitHub Copilot. Je Runde geht
+ein JPEG der entzerrten Arena (eigener Roboter grün „DU“, Gegner rot, Rand weiß, Zone
+orange, Objekte als Kreise) und ein kurzer Lagetext an das Modell. Das Modell antwortet
+nur über eigene Werkzeuge: `drive`/`stop` (Steuerart „direkt“) oder `set_tactic`
+(„taktik“), dazu immer `ulti` und `say`. Andere Werkzeuge (Dateien, Shell) sind gesperrt.

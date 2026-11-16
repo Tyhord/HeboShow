@@ -51,7 +51,7 @@ alle Bühnen denselben Kampf und niemand rechnet etwas anders. Clients sind dün
 liefern die Seiten selbst über einen lokalen Mini-Server aus und holen alles andere vom
 Server. So brauchen sie weder Kamera noch Torch und starten auf jedem Windows-Gerät.
 Server und Client haben je ein eigenes `.venv`, verwaltet mit `uv`. Kein Docker, kein
-Internet. Die Oberfläche bleibt HTML/Canvas in pywebview, weil Effekte dort einfacher sind
+Internet (Ausnahme: der KI-Pilot, siehe unten). Die Oberfläche bleibt HTML/Canvas in pywebview, weil Effekte dort einfacher sind
 als in OpenCV-Fenstern.
 
 **Rollen per Name, Passwort und Rechte nur auf dem Server.**
@@ -137,6 +137,27 @@ Spart rund 2 GB CUDA-Download. Auf einem NVIDIA-Rechner nach `uv sync` die CUDA-
 ins `.venv` nachinstallieren (siehe README) und dann ohne `uv run` starten, das würde
 wieder die CPU-Variante einspielen.
 
+**KI-Pilot im Server, nicht als eigenes Programm.**
+Nur der Server kennt Kamerabild, Positionen, HP und Phase ohne Verzögerung; ein eigener
+Prozess müsste all das erst über das Netz holen. Deshalb läuft je KI-Platz ein Thread in
+`hebocon/pilot.py`, eingestellt im Reiter „KI“ der Bedienung. Die KI ändert das Spiel nur
+über dieselben Aktionen wie ein Mensch (`ulti`, dazu `say`), damit sie keine Regel umgehen
+kann. Angebunden über das `github-copilot-sdk`, damit das vorhandene Copilot-Abo reicht und
+kein eigener API-Schlüssel nötig ist. Die KI bekommt nur ihre eigenen Werkzeuge, keine
+Shell und keine Dateien.
+
+**Taktik-Steuerung als Standard.**
+Eine Modellantwort braucht ein bis drei Sekunden; in der Zeit ist ein Hebocon-Roboter
+längst woanders. In der Steuerung „Taktik“ wählt die KI deshalb nur ein Manöver
+(rammen, hinausschieben, flankieren, umkreisen, zurückziehen, ausweichen, halten), und ein
+Regler im Server fährt es mit 20 Hz aus den Tracking-Daten. Vor jeder Taktik hält er Abstand
+zur Kante. „Direkt“ bleibt für Neugierige, die sehen wollen, wie die KI selbst
+lenkt.
+
+**Fahrtrichtung aus der Bewegung.**
+Das Tracking kennt nur Positionen. Die Blickrichtung des Roboters schätzt der Pilot daraus,
+wohin er sich bei Vorwärtsfahrt bewegt; so braucht es keinen Marker auf dem Roboter.
+
 ## Grenzen
 
 * **Licht und Kamera müssen ruhig bleiben.** Ändert sich das Licht oder wackelt die
@@ -170,4 +191,16 @@ wieder die CPU-Variante einspielen.
 * **Nur fürs vertraute LAN.** HTTP und WebSocket laufen unverschlüsselt; Passwort und
   Tokens sind im Netz mitlesbar. Nicht ins Internet freigeben.
 * **Höchstens zwei Spieler.** Ein dritter Name bekommt „Beide Spielerplätze sind belegt“
-  und kann als Bühne zuschauen.
+  und kann als Bühne zuschauen. Eine KI zählt als Spieler.
+* **KI braucht Internet und ein Copilot-Abo.** Jede Anfrage mit Bild zählt als
+  Premium-Anfrage mit dem Faktor des Modells; `HEBOCON_AI_MAX_CALLS` begrenzt sie je Kampf.
+  Klassische Tokens (`ghp_…`) nimmt Copilot nicht an.
+* **KI ist langsam.** Ein bis drei Sekunden je Entscheidung; auf schnelle Wendungen
+  reagiert nur der Regler der Taktik-Steuerung.
+* **Bluetooth-Abbruch:** Die Firmware fährt mit dem letzten Befehl weiter, bis wieder ein
+  neuer kommt. Bricht die Verbindung im Kampf ab, „Verbinden“ drücken oder den Kampf abbrechen.
+* **Fahrtrichtung geschätzt.** Steht der Roboter still oder wird er geschoben, ist sie
+  unsicher; der Pilot fährt dann erst ein Stück vor. Dass `d` im Bild rechts herum dreht, ist
+  angenommen, nicht gemessen.
+* **KI-Plätze nicht dauerhaft.** Nach einem Neustart des Servers ist wieder „Mensch gegen
+  Mensch“.

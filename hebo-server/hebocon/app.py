@@ -21,6 +21,7 @@ from .camera import Camera
 from .config import BALANCING, Settings
 from .game import Game, RobotInput
 from .lobby import Lobby
+from .pilot import STEERINGS, Pilots
 from .tracking import Arbiter, Tracker
 
 log = logging.getLogger(__name__)
@@ -35,6 +36,11 @@ VIEW_PAD = 80.0
 # Spielzeit, nach der ein Medium spätestens endet, falls keine Bühne „ended“ meldet.
 MEME_LIMIT_S = {"image": 6.5, "video": 30.0, "audio": 90.0}
 CUTOUT_LIMIT_S = 120.0
+# Welche Plätze im jeweiligen KI-Modus ein Modell steuert.
+AI_MODES = {"mensch": (), "mensch-ki": (2,), "ki-ki": (1, 2)}
+# Während dieser Phasen stehen die Gegner fest; ein Wechsel würde den laufenden Kampf verfälschen.
+FIGHT_PHASES = ("intro", "ready", "countdown", "fight")
+SAY_MAX = 80
 
 
 class UserError(Exception):
@@ -96,6 +102,9 @@ class App:
         self.latency_ms = 0.0
         self.track_error: str | None = None
         self.packet: tuple[int, bytes] = (0, b"")
+        # Sprechblasen je Roboter: (Text, Ablaufzeit).
+        self.says: dict[int, tuple[str, float]] = {}
+        self.ai = Pilots(self)
         self._lock = threading.RLock()
         self._stop = threading.Event()
 
@@ -122,6 +131,7 @@ class App:
 
     def stop(self) -> None:
         self._stop.set()
+        self.ai.stop_all(timeout=2.0)
         self.camera.stop()
 
     def _background(self, label: str, fn) -> None:
@@ -149,7 +159,8 @@ class App:
         if handler is None:
             raise UserError(f"Unbekannte Aktion '{action}'.")
         if self.busy and action not in ("camera", "abort", "spawn", "shrink", "hud", "profile", "cue", "ko",
-                                        "ulti", "balancing", "balancing_reset", "name", "kick"):
+                                        "ulti", "balancing", "balancing_reset", "name", "kick", "say",
+                                        "ai_mode", "ai_slot", "ai_connect", "ai_probe"):
             raise UserError(f"Bitte warten: {self.busy}")
         with self._lock:
             handler(**data)
@@ -281,6 +292,8 @@ class App:
     def do_kick(self, slot: int) -> None:
         if self.lobby is None or slot not in (1, 2):
             raise UserError("Unbekannter Spielerplatz.")
+        if slot in AI_MODES[self.ai.mode]:
+            raise UserError(f"Platz {slot} steuert die KI. Im Reiter „KI“ den Modus ändern.")
         name = self.lobby.kick(slot)
         if name is None:
             raise UserError(f"Platz {slot} ist schon frei.")
@@ -318,6 +331,78 @@ class App:
             raise UserError(f"Ulti von {p.name} ist noch nicht geladen.")
         if not self.game.fire_ulti(player, time.monotonic()):
             raise UserError("Kein Ziel: beide Roboter müssen schon gesehen worden sein.")
+
+    def do_say(self, player: int, text: str) -> None:
+        if player not in (1, 2):
+            raise UserError("Unbekannter Roboter.")
+        text = " ".join(str(text).split())[:SAY_MAX]
+        if text:
+            self.says[player] = (text, time.monotonic() + self.cfg.say_s)
+        else:
+            self.says.pop(player, None)
+
+    # ---------- KI-Piloten ----------
+
+    def _ai_guard(self) -> None:
+        if self.phase in FIGHT_PHASES:
+            raise UserError("Die KI-Einstellungen erst nach dem Kampf ändern.")
+
+    def do_ai_probe(self) -> None:
+        self.ai.probe()
+
+    def do_ai_mode(self, mode: str) -> None:
+        if mode not in AI_MODES:
+            raise UserError("Unbekannter KI-Modus.")
+        self._ai_guard()
+        if mode != "mensch" and self.ai.login["state"] is None:
+            self.ai.probe()
+        old, new = AI_MODES[self.ai.mode], AI_MODES[mode]
+        self.ai.mode = mode
+        for slot in (1, 2):
+            if slot in old and slot not in new:
+                self.ai.stop(slot)
+                if self.lobby is not None:
+                    self.lobby.release_ai(slot)
+                self.player_joined(slot, f"Roboter {slot}")
+            elif slot in new and slot not in old:
+                self._reserve_ai(slot)
+                self.ai.start(slot)
+        self.message = {"mensch": "Mensch gegen Mensch.", "mensch-ki": "Mensch gegen KI auf Platz 2.",
+                        "ki-ki": "KI gegen KI."}[mode]
+
+    def _reserve_ai(self, slot: int) -> None:
+        name = self.ai.label(slot)
+        if self.lobby is not None:
+            moved = self.lobby.reserve_ai(slot, name)
+            if moved is not None and moved[1] is not None:
+                self.player_joined(moved[1], moved[0])
+        self.player_joined(slot, name)
+
+    def do_ai_slot(self, slot: int, model: str = "", steering: str = "taktik", robot: str = "") -> None:
+        if slot not in (1, 2):
+            raise UserError("Unbekannter Spielerplatz.")
+        if steering not in STEERINGS:
+            raise UserError("Unbekannte Steuerung.")
+        self._ai_guard()
+        model = str(model).strip()
+        if model and self.ai.models and model not in {m["id"] for m in self.ai.models}:
+            raise UserError(f"Modell „{model}“ gibt es in diesem Copilot-Abo nicht oder sieht keine Bilder.")
+        robot = str(robot).strip() or f"{self.cfg.ai_robot_prefix}{slot}"
+        self.ai.config[slot] = {"model": model, "steering": steering, "robot": robot}
+        if slot in AI_MODES[self.ai.mode]:
+            self._reserve_ai(slot)
+            self.ai.start(slot)
+
+    def do_ai_connect(self, slot: int) -> None:
+        if slot not in AI_MODES[self.ai.mode]:
+            raise UserError(f"Platz {slot} steuert gerade keine KI.")
+        if not self.ai.config[slot]["model"]:
+            raise UserError("Erst ein Modell wählen.")
+        if self.ai.login["state"] != "ok":
+            self.ai.probe()
+        # Neu verbinden geht auch im Kampf: nach einem Bluetooth-Abbruch soll der Roboter weiterkämpfen.
+        self.ai.start(slot)
+        self.message = f"KI auf Platz {slot} verbindet …"
 
     def do_cue(self, kind: str, media: dict | None = None, id: int | None = None) -> None:  # noqa: A002
         t = time.monotonic()
@@ -551,8 +636,10 @@ class App:
 
     def state(self, t: float) -> dict:
         robots = []
+        ai_slots = AI_MODES[self.ai.mode]
         for o in self.robots:
             p = self.game.player(o.id) if self.game else None
+            say = self.says.get(o.id)
             robots.append({
                 "id": o.id, "name": p.name if p else self.names[o.id - 1], "present": o.present,
                 "hp": round(p.hp, 1) if p else self.cfg.start_hp, "max_hp": self.cfg.start_hp,
@@ -560,6 +647,7 @@ class App:
                 "ulti": {"charge": round(self.game.ulti_charge(p), 2), "ready": self.game.ulti_ready(p),
                          "used": p.ulti_used} if p else {"charge": 0.0, "ready": False, "used": False},
                 "center": _points(o.pos), "contour": _points(o.outline),
+                "ai": o.id in ai_slots, "say": say[0] if say and say[1] > t else None,
             })
         items, events = [], []
         if self.game:
@@ -605,6 +693,7 @@ class App:
             "lobby": self.lobby.public() if self.lobby else {"players": [], "online": {}},
             # Zähler statt Liste: das Soundboard lädt /media nur neu, wenn sich der Ordner geändert hat.
             "board": {"rev": self.board_rev, "keying": dict(self.keying)},
+            "ai": self.ai.public(ai_slots),
         }
 
     def _publish(self, image: np.ndarray, seq: int) -> None:

@@ -38,6 +38,8 @@ class Lobby:
         # name.lower() → {"name", "token", "slot"}; slot None heißt: bekannt, aber gerade nicht im Spiel.
         self.players: dict[str, dict] = {}
         self.online: dict[str, int] = {}
+        # Platz → Anzeigename des KI-Piloten; nur im Speicher, nach einem Neustart steuern wieder Menschen.
+        self.ai: dict[int, str] = {}
         self._lock = threading.Lock()
         self._load()
 
@@ -79,7 +81,7 @@ class Lobby:
         if slot is None and renamed is not None:
             slot, renamed["slot"] = renamed["slot"], None
         if slot is None:
-            taken = {r["slot"] for r in self.players.values()}
+            taken = {r["slot"] for r in self.players.values()} | set(self.ai)
             slot = next((s for s in (1, 2) if s not in taken), None)
         if slot is None:
             raise LobbyError("Beide Spielerplätze sind belegt.", "full")
@@ -118,6 +120,23 @@ class Lobby:
             self._save()
             return record["name"]
 
+    def reserve_ai(self, slot: int, name: str) -> tuple[str, int | None] | None:
+        """Platz für die KI belegen; ein Mensch dort rückt auf den anderen Platz oder verliert seinen."""
+        with self._lock:
+            self.ai[slot] = name
+            record = next((r for r in self.players.values() if r["slot"] == slot), None)
+            if record is None:
+                return None
+            other = 3 - slot
+            free = other not in self.ai and all(r["slot"] != other for r in self.players.values())
+            record["slot"] = other if free else None
+            self._save()
+            return record["name"], record["slot"]
+
+    def release_ai(self, slot: int) -> None:
+        with self._lock:
+            self.ai.pop(slot, None)
+
     # ---------- Abfragen ----------
 
     def session(self, token: str | None) -> dict | None:
@@ -153,6 +172,7 @@ class Lobby:
         with self._lock:
             players = [{"slot": r["slot"], "name": r["name"], "online": r["token"] in self.online}
                        for r in self.players.values() if r["slot"]]
+            players += [{"slot": s, "name": n, "online": True, "ai": True} for s, n in self.ai.items()]
             counts = {"stage": 0, "moderator": 0, "player": 0}
             for token, n in self.online.items():
                 role = self.sessions.get(token, {}).get("role")

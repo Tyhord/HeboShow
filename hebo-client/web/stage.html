@@ -711,8 +711,41 @@ function drawRobot(v, r, t) {
   }
   if (r.center) {
     const [x, y] = toCanvas(v, r.center);
-    label(r.name, x, y - 12, color, 18);
+    label(`${r.ai ? "🤖 " : ""}${r.name}`, x, y - 12, color, 18);
+    if (r.say) bubble(r.say, x, y - 40, color);
   }
+}
+
+// Sprechblase der KI; bricht lange Sprüche um, damit sie nicht über den Bildrand laufen.
+function bubble(text, x, y, color) {
+  ctx.save();
+  ctx.font = "800 20px Inter, Arial, sans-serif";
+  const lines = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && ctx.measureText(next).width > 280) { lines.push(line); line = word; } else line = next;
+  }
+  lines.push(line);
+  const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 28;
+  const h = lines.length * 24 + 16;
+  const bx = Math.min(Math.max(x - w / 2, 8), canvas.width - w - 8);
+  const by = Math.max(y - h, 8);
+  ctx.beginPath();
+  ctx.roundRect(bx, by, w, h, 14);
+  ctx.moveTo(x - 10, by + h);
+  ctx.lineTo(x, by + h + 14);
+  ctx.lineTo(x + 10, by + h);
+  ctx.fillStyle = "#ffffffee";
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#111";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  lines.forEach((l, i) => ctx.fillText(l, bx + w / 2, by + 9 + i * 24));
+  ctx.restore();
 }
 
 function label(text, x, y, color, size) {
@@ -1084,7 +1117,7 @@ function updateHud(s) {
     const max = r ? r.max_hp : s.balancing.start_hp;
     const hp = r ? Math.max(0, r.hp) : max;
     const pct = `calc(${Math.min(100, (100 * hp) / max)}% - 6px)`;
-    el.querySelector(".name").textContent = r?.name || s.names?.[id - 1] || `Roboter ${id}`;
+    el.querySelector(".name").textContent = `${r?.ai ? "🤖 " : ""}${r?.name || s.names?.[id - 1] || `Roboter ${id}`}`;
     el.querySelector(".fill").style.width = pct;
     el.querySelector(".trail").style.width = pct;
     el.querySelector(".hp-text").innerHTML = r?.outside

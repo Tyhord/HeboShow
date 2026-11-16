@@ -12,6 +12,10 @@
   gewählten Netzwerkadapters, UDP **8766** für die Suche im LAN. Keine Fenster, nur Konsole.
 * Client: eigenes `.venv` mit nur `pywebview`. Liefert die Seiten über einen lokalen
   Mini-Server auf `127.0.0.1` (Zufallsport) aus und verbindet sie mit dem LAN-Server.
+* KI-Pilot: `github-copilot-sdk` (lädt die Copilot-Laufzeit beim ersten Start aus dem
+  Internet) und `bleak` für Bluetooth.
+  Anmeldung über die Copilot-CLI auf dem Server-PC (`copilot`, dann `/login`) oder
+  `HEBOCON_AI_GITHUB_TOKEN`. Ohne Roboter testen mit `HEBOCON_AI_DRY_RUN=true`.
 
 ## Struktur
 
@@ -29,6 +33,7 @@ hebo-server/
     game.py         HP-Regeln
     app.py          Ablauf, Aktionen, Zustand, Paket
     lobby.py        Rollen, Tokens, Spielerplätze, lobby.json
+    pilot.py        KI-Pilot: Copilot-Sitzung, Werkzeuge, Taktik-Regler, Bluetooth zum Roboter
     discovery.py    UDP-Antwort für die Server-Suche
     server.py       Starlette: /lobby, /api, /ws, /media, /memes
   tests/            pytest, synthetisch, ohne Modell und Kamera

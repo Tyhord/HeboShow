@@ -18,6 +18,8 @@ dependencies = [
     "websockets>=17.4",
     "aiortc>=1.15.0",
     "psutil>=7.2.2",
+    "github-copilot-sdk>=1.0.34",
+    "bleak>=3.1.0",
 ]
 
 [dependency-groups]

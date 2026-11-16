@@ -122,7 +122,7 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
 * Freigestellte Memes erscheinen auf der Bühne ohne Rahmen, Schatten oder Hintergrund und
   laufen bis zu ihrem Ende, auch über 30 s.
 
-**Rechts: Einstellungen** mit Reitern „📷 Kamera · 🔳 Spielfeld · 🤖 Roboter · ⚖ Balancing“.
+**Rechts: Einstellungen** mit Reitern „📷 Kamera · 🔳 Spielfeld · 🤖 Roboter · ⚖ Balancing · 🧠 KI“.
 Der Reiter folgt dem Ablauf (keine Kamera → Kamera, Kalibrierung → Spielfeld, Registrierung
 → Roboter, sonst Kamera mit dem Technik-Status). Ein Klick zeigt einen anderen Reiter, bis der Ablauf
 weiterspringt. Über den Reitern stehen:
@@ -142,7 +142,8 @@ Darunter je Reiter:
   über ▶ links (erst aktiv, wenn beide erkannt sind) oder Enter im Namensfeld.
   Darunter „Spieler im LAN“: je belegtem Platz Nummer, Name, ein Punkt für online/offline
   und „Entfernen“ (nach Rückfrage wird der Platz frei, der Name bleibt gespeichert), dazu
-  wie viele Bühnen, Moderationen und Spieler verbunden sind.
+  wie viele Bühnen, Moderationen und Spieler verbunden sind. KI-Plätze tragen ein 🤖 vor
+  dem Namen und haben kein „Entfernen“; sie gibt man im Reiter KI frei.
 * **Balancing**: alle Spielregel-Werte aus [02-spielregeln.md](02-spielregeln.md) als
   Zahlenfelder mit Einheit, gruppiert nach Lebenspunkte, Ringout, Kollision, Hindernis,
   Power-up, Laser-Ulti und Schrumpfende Arena. Anteile stehen in Prozent, Strecken in
@@ -150,6 +151,22 @@ Darunter je Reiter:
   gedrückt wird, sofort auch im laufenden Kampf, und bleibt nach einem Neustart erhalten.
   Ungültige Werte springen zurück, das Feld wird kurz rot umrandet und die Meldung sagt,
   welcher Bereich erlaubt ist. „↺ Standardwerte“ setzt nach Rückfrage alles zurück.
+* **KI**: lässt ein Copilot-Modell einen Roboter fahren (Ablauf in
+  [03-match-ablauf.md](03-match-ablauf.md)).
+  * „Wer kämpft?“: Mensch gegen Mensch, Mensch gegen KI (KI auf Platz 2) oder KI gegen KI.
+    Im Kampf gesperrt.
+  * „GitHub Copilot“: zeigt, als wer der Server angemeldet ist und wie viele Modelle Bilder
+    verstehen, sonst den Fehler mit dem nächsten Schritt. „Anmeldung & Modelle laden“
+    prüft erneut. Angemeldet wird einmal auf dem Server-PC: `copilot` starten und
+    `/login`, oder `HEBOCON_AI_GITHUB_TOKEN` setzen. Läuft der Server im Probelauf
+    (`HEBOCON_AI_DRY_RUN`), steht hier ein Hinweis.
+  * Je Platz „KI auf Platz n“ (nur aktiv, wenn der Modus dort eine KI vorsieht): Modell
+    (nur Modelle mit Bildverständnis, mit Premium-Faktor „×n“), Steuerung „Taktik“
+    (empfohlen: die KI wählt ein Manöver, ein Regler im Server fährt es) oder „Direkt“ (die
+    KI drückt die Tasten selbst), Bluetooth-Name des Roboters (leer = `hebobot #n`).
+    „Übernehmen“ speichert und startet die KI neu, „Verbinden“ verbindet neu, auch im Kampf,
+    etwa nach einem Bluetooth-Abbruch. Darunter Status, Fehler, aktuelle Taktik und Taste,
+    „Anfragen: x / y“ und der letzte Kommentar der KI.
 
 Im Bild:
 
@@ -215,7 +232,10 @@ Großschrift.
 * **HUD oben**: links und rechts Name, Lebensbalken mit Verlauf und hellem Nachlauf,
   darunter „x / 100 HP“. Unter 25 HP flackert der Balken. Draußen steht dort „RINGOUT!“
   und der Umriss blinkt rot. Darunter eine schmale ⚡-Leiste mit der Ulti-Ladung; ist sie
-  voll, pulsiert das ⚡, nach dem Schuss ist sie ausgegraut.
+  voll, pulsiert das ⚡, nach dem Schuss ist sie ausgegraut. Fährt eine KI, steht ein 🤖
+  vor ihrem Namen.
+* **Sprechblase**: Sagt eine KI etwas (`say`), steht es einige Sekunden
+  (`HEBOCON_SAY_S`) als weiße Sprechblase mit Rand in der Farbe ihres Platzes über ihrem Roboter.
 * **Mitte oben**: Kampfzeit `mm:ss`, zählt hoch, darunter die Phase (BEREIT, GLEICH
   GEHT'S LOS, ACHTUNG, KAMPF, ENDE).
 * **Intro**: Nach „Start“ läuft `if-intro.mp4` einmal bildfüllend mit Ton. Erlaubt der

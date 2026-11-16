@@ -39,6 +39,20 @@ setzen. Vorlage: [`../hebo-server/.env.example`](../hebo-server/.env.example). N
 | `HEBOCON_FOREGROUND_THRESHOLD` | `18` | Kleiner = empfindlicher, größer = weniger Rauschen |
 | `HEBOCON_MIN_ROBOT_AREA_PX` | `400` | Kleinere Klumpen werden ignoriert |
 
+## KI-Pilot
+
+Siehe Reiter „🧠 KI“ in [04-bedienung.md](04-bedienung.md).
+
+| Variable | Standard | Wirkung |
+| --- | --- | --- |
+| `HEBOCON_AI_GITHUB_TOKEN` | leer | Leer = Anmeldung der Copilot-CLI auf dem Server-PC. Sonst ein fein granulares Token (`github_pat_…`) oder OAuth-Token (`gho_…`, `ghu_…`) mit Copilot-Zugang; klassische `ghp_…`-Tokens gehen nicht |
+| `HEBOCON_AI_TURN_S` | `1.5` | Mindestabstand zwischen zwei Bildern ans Modell in Sekunden; kürzer kostet mehr Anfragen |
+| `HEBOCON_AI_IMAGE_PX` | `512` | Kantenlänge des Bildes ans Modell |
+| `HEBOCON_AI_MAX_CALLS` | `200` | Höchstzahl Modellanfragen je Pilot und Kampf; danach bleibt der Roboter stehen |
+| `HEBOCON_AI_DRY_RUN` | `false` | `true` = ohne Roboter testen, Fahrbefehle stehen nur in der Konsole |
+| `HEBOCON_AI_ROBOT_PREFIX` | `hebobot #` | Bluetooth-Name des Roboters vor der Platznummer, wenn im Reiter keiner eingetragen ist. In der `.env` in Anführungszeichen, sonst gilt `#` als Kommentar |
+| `HEBOCON_SAY_S` | `4` | So lange steht eine Sprechblase auf der Bühne (Sekunden) |
+
 ## Spielregeln
 
 Siehe [02-spielregeln.md](02-spielregeln.md).
