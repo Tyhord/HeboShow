@@ -581,6 +581,8 @@ class App:
                 "corrections": self.tracker.corrections if self.tracker is not None else 0}
 
     def state(self, t: float) -> dict:
+        # Der Server liefert nur Wahrnehmung: Kamera, Tracking, Arena, Roboter, Hindernisse und Status.
+        # Die Fahrentscheidung bleibt im Client; dadurch kann Server und KI-PC auf getrennten Laptops laufen.
         robots = []
         lobby = self.lobby.public() if self.lobby else {"players": [], "online": {}}
         ai_slots = {p["slot"] for p in lobby["players"] if p.get("ai")}

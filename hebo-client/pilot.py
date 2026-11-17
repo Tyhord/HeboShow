@@ -15,12 +15,61 @@ import logging
 import math
 import os
 import re
+import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Literal
+
+class TerminalSwitch:
+    """Hält eine kleine Tasten-Queue für den Laufzeit-Wechsel zwischen manuell und auto bereit."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._queue: list[str] = []
+        self._stopped = threading.Event()
+
+    def push(self, key: str) -> None:
+        with self._lock:
+            self._queue.append(key)
+
+    def pop(self) -> str | None:
+        with self._lock:
+            if not self._queue:
+                return None
+            return self._queue.pop(0)
+
+    def stop(self) -> None:
+        self._stopped.set()
+
+    def resume(self) -> None:
+        self._stopped.clear()
+
+    def run(self) -> None:
+        while not self._stopped.is_set():
+            try:
+                if sys.platform.startswith("win"):
+                    import msvcrt
+
+                    if msvcrt.kbhit():
+                        key = msvcrt.getwch()
+                        if key in ("p", "P"):
+                            self.push("p")
+                        elif key == " ":
+                            self.push(" ")
+                        elif key in ("m", "M"):
+                            self.push("m")
+                        elif key in ("a", "A"):
+                            self.push("a")
+                        elif key in ("r", "R"):
+                            self.push("r")
+                time.sleep(0.05)
+            except Exception:
+                self._stopped.set()
+                break
 
 import cv2
 import numpy as np
@@ -32,6 +81,7 @@ CHAR_UUID = "19B10001-E8F2-537E-4F6C-D104768A1214"
 ROBOT_PREFIX = "hebobot"
 STOP = " "
 STEERINGS = ("taktik", "direkt")
+CONTROL_MODES = ("manual", "auto")
 # Reihenfolge wie bei der Copilot-CLI; GITHUB_TOKEN ist oft ein klassisches ghp_ und kommt deshalb zuletzt.
 TOKEN_ENV = ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
 ACCESSES = ("copilot", "openai")
@@ -43,8 +93,8 @@ OPENAI_SKIP = re.compile(r"audio|realtime|tts|transcribe|search|image|codex|-pro
                          r"|\d{4}-\d{2}-\d{2}")
 # Diese Familien denken vor jeder Antwort; „low“ hält sie im Kampf schnell genug.
 OPENAI_REASONING = re.compile(r"^(gpt-[5-9]|o\d)")
-DEFAULTS = {"access": "", "model": "", "steering": "taktik", "robot": "", "turn_s": 1.5, "max_calls": 200,
-            "image_px": 512}
+DEFAULTS = {"access": "", "model": "", "steering": "taktik", "robot": "", "control_mode": "manual",
+            "turn_s": 1.5, "max_calls": 200, "image_px": 512}
 WATCH_S = 0.05
 STATUS_S = 2.0
 # Älterer Zustand heißt: Server weg. Dann lieber anhalten als nach altem Bild weiterfahren.
@@ -98,10 +148,11 @@ class Setup:
     model: str
     label: str
     effort: str | None
-    steering: str
+    steering: str = "taktik"
+    control_mode: str = "manual"
     # Leer = Probelauf ohne Roboter.
-    robot: str
-    token: str
+    robot: str = ""
+    token: str = ""
     turn_s: float = 1.5
     max_calls: int = 200
     image_px: int = 512
@@ -279,12 +330,121 @@ class Driver:
     """Fährt eine vom Modell gewählte Taktik 20× pro Sekunde; das Modell selbst ist dafür zu langsam."""
 
     def __init__(self):
-        self.tactic = "hold"
+        self.tactic = "plan_b"
         self.side = 1
         self._pulse: list[tuple[str, float]] = []
 
     def set(self, tactic: str, side: int) -> None:
+        if tactic in ("auto", "plan_b"):
+            tactic = "plan_b"
         self.tactic, self.side = tactic, side
+
+    def _plan_b_mode(self, snap: Snapshot, heading: Heading, center: np.ndarray) -> str:
+        me, foe = snap.me, snap.foe
+        if not me.present or snap.bounds is None:
+            return "hold"
+        x0, y0, x1, y1 = snap.bounds
+        margin = me.radius + EDGE_MARGIN
+        near_edge = not (x0 + margin < me.pos[0] < x1 - margin and y0 + margin < me.pos[1] < y1 - margin)
+        if near_edge:
+            return "edge_safe"
+        if not foe.present:
+            return "hold"
+        gap = float(np.linalg.norm(foe.pos - me.pos)) - me.radius - foe.radius
+        if gap < 40.0:
+            return "dodge"
+        if gap < 150.0:
+            if heading.angle is None:
+                return "retreat"
+            want = math.atan2(float(foe.pos[1] - me.pos[1]), float(foe.pos[0] - me.pos[0]))
+            diff = _wrap(want - heading.angle)
+            if abs(diff) > math.radians(60):
+                return "flank"
+            return "attack"
+        if gap < 220.0:
+            return "flank"
+        return "attack"
+
+    def _plan_b_key(self, snap: Snapshot, heading: Heading, t: float) -> str:
+        me, foe = snap.me, snap.foe
+        if self.tactic == "hold" or not me.present or snap.bounds is None:
+            return STOP
+        x0, y0, x1, y1 = snap.bounds
+        margin = me.radius + EDGE_MARGIN
+        center = np.array([(x0 + x1) / 2, (y0 + y1) / 2], np.float32)
+        mode = self._plan_b_mode(snap, heading, center)
+        if mode == "edge_safe":
+            outward = _unit(me.pos - center)
+            if heading.angle is None:
+                return self._start([("s", 0.3)], t)
+            front = np.array([math.cos(heading.angle), math.sin(heading.angle)])
+            if float(front @ outward) > 0.3:
+                return self._start([("s", 0.35)], t)
+            target = center
+            want = math.atan2(float(target[1] - me.pos[1]), float(target[0] - me.pos[0]))
+            diff = _wrap(want - heading.angle)
+            if abs(diff) < ALIGN:
+                return "s"
+            spin = "d" if diff > 0 else "a"
+            return self._start([(spin, min(0.6, max(0.1, abs(diff) / SPIN_RATE))), ("s", 0.4)], t)
+        if mode == "dodge":
+            if not foe.present:
+                return STOP
+            away = _unit(me.pos - foe.pos)
+            target = me.pos + np.array([-away[1], away[0]]) * self.side * 200
+            target = np.clip(target, [x0 + margin, y0 + margin], [x1 - margin, y1 - margin])
+            if heading.angle is None:
+                return self._start([("w", 0.25)], t)
+            want = math.atan2(float(target[1] - me.pos[1]), float(target[0] - me.pos[0]))
+            diff = _wrap(want - heading.angle)
+            if abs(diff) < ALIGN:
+                return "w"
+            spin = "d" if diff > 0 else "a"
+            return self._start([(spin, min(0.6, max(0.1, abs(diff) / SPIN_RATE))), ("w", 0.35)], t)
+        if mode == "retreat":
+            if not foe.present:
+                return STOP
+            away = _unit(me.pos - foe.pos)
+            target = me.pos + away * 250
+            target = np.clip(target, [x0 + margin, y0 + margin], [x1 - margin, y1 - margin])
+            if heading.angle is None:
+                return self._start([("s", 0.4)], t)
+            want = math.atan2(float(target[1] - me.pos[1]), float(target[0] - me.pos[0]))
+            diff = _wrap(want - heading.angle)
+            if abs(diff) < ALIGN:
+                return "s"
+            spin = "d" if diff > 0 else "a"
+            return self._start([(spin, min(0.6, max(0.1, abs(diff) / SPIN_RATE))), ("s", 0.35)], t)
+        if mode == "flank":
+            if not foe.present:
+                return STOP
+            away = _unit(me.pos - foe.pos)
+            perp = np.array([-away[1], away[0]]) * self.side
+            point = foe.pos + perp * (me.radius + foe.radius + 80)
+            target = point if float(np.linalg.norm(point - me.pos)) > 90 else foe.pos
+            target = np.clip(target, [x0 + margin, y0 + margin], [x1 - margin, y1 - margin])
+            if heading.angle is None:
+                return self._start([("w", 0.25)], t)
+            want = math.atan2(float(target[1] - me.pos[1]), float(target[0] - me.pos[0]))
+            diff = _wrap(want - heading.angle)
+            if abs(diff) < ALIGN:
+                return "w"
+            spin = "d" if diff > 0 else "a"
+            return self._start([(spin, min(0.6, max(0.1, abs(diff) / SPIN_RATE))), ("w", 0.4)], t)
+        if mode == "attack":
+            if not foe.present:
+                return STOP
+            target = foe.pos
+            target = np.clip(target, [x0 + margin, y0 + margin], [x1 - margin, y1 - margin])
+            if heading.angle is None:
+                return self._start([("w", 0.25)], t)
+            want = math.atan2(float(target[1] - me.pos[1]), float(target[0] - me.pos[0]))
+            diff = _wrap(want - heading.angle)
+            if abs(diff) < ALIGN:
+                return "w"
+            spin = "d" if diff > 0 else "a"
+            return self._start([(spin, min(0.6, max(0.1, abs(diff) / SPIN_RATE))), ("w", 0.4)], t)
+        return STOP
 
     def key(self, snap: Snapshot, heading: Heading, t: float) -> str:
         while self._pulse and self._pulse[0][1] <= t:
@@ -292,6 +452,8 @@ class Driver:
         if self._pulse:
             return self._pulse[0][0]
         me, foe = snap.me, snap.foe
+        if self.tactic in ("auto", "plan_b"):
+            return self._plan_b_key(snap, heading, t)
         if self.tactic == "hold" or not me.present or snap.bounds is None:
             return STOP
         x0, y0, x1, y1 = snap.bounds
@@ -366,10 +528,10 @@ class DriveArgs(BaseModel):
 
 
 class TacticArgs(BaseModel):
-    tactic: Literal["ram", "push_out", "flank", "circle", "retreat", "dodge", "hold"] = Field(
+    tactic: Literal["ram", "push_out", "flank", "circle", "retreat", "dodge", "hold", "plan_b"] = Field(
         description="ram: rammen. push_out: von der Mittelseite aus Richtung Rand schieben. flank: seitlich "
                     "angreifen. circle: umkreisen. retreat: Abstand gewinnen. dodge: seitlich ausweichen. "
-                    "hold: stehen bleiben.")
+                    "hold: stehen bleiben. plan_b: automatische Regelsteuerung (Fallback).")
     side: Literal["left", "right"] = Field("right", description="Seite für flank, circle und dodge.")
 
 
@@ -523,8 +685,10 @@ async def _scan() -> list[str]:
     return sorted({d.name for d in devices if d.name and d.name.lower().startswith(ROBOT_PREFIX)})
 
 
-def _choose(title: str, options: list[str], default: int) -> int:
+def _choose(title: str, options: list[str], default: int, *, example: str | None = None) -> int:
     print(title)
+    if example:
+        print(f"  Beispiel: {example}")
     for i, text in enumerate(options, 1):
         print(f"  {i}) {text}")
     while True:
@@ -537,30 +701,13 @@ def _choose(title: str, options: list[str], default: int) -> int:
 
 
 def setup(cfg: dict) -> Setup:
-    """Fragt Zugang, Modell, Steuerung und Roboter ab; die Antworten sind beim nächsten Start Vorgabe."""
+    """Fragt nur noch Roboter und Startmodus ab; Plan B fährt ohne LLM-Modell."""
     ai = {**DEFAULTS, **cfg.get("ai", {})}
-    if ai["access"] not in ACCESSES:
-        ai["access"] = "openai" if os.environ.get("OPENAI_API_KEY") else "copilot"
-    access = ACCESSES[_choose("Womit soll die KI denken?", [
-        "GitHub Copilot – über dein Copilot-Abo",
-        "OpenAI – eigener API-Schlüssel (sk-…), Abrechnung pro Aufruf"], ACCESSES.index(ai["access"]))]
-    print("Richte die KI ein (beim ersten Mal lädt das Copilot-SDK einige Sekunden nach) …")
-    _ensure_runtime()
-    token = key = ""
-    if access == "copilot":
-        token, models = _copilot_login()
-    else:
-        key, models = _openai_login()
-
-    names = [m["name"] + (f" (×{m['multiplier']:g})" if m["multiplier"] is not None else "") for m in models]
-    fallback = next((i for i, m in enumerate(models) if m["id"] == OPENAI_DEFAULT and access == "openai"), 0)
-    pick = next((i for i, m in enumerate(models) if m["id"] == ai["model"]), fallback)
-    model = models[_choose("Welches Modell soll kämpfen?", names, pick)]
-
-    steering = STEERINGS[_choose("Wie soll es steuern?", [
-        "taktik – Modell wählt Taktiken, ein schneller Regler fährt (empfohlen)",
-        "direkt – Modell fährt selbst kurze Stücke"], STEERINGS.index(ai["steering"])
-        if ai["steering"] in STEERINGS else 0)]
+    control_mode = CONTROL_MODES[_choose("Wie startet die Steuerung?", [
+        "manuell – externe WASD-Tasten oder Handsteuerung",
+        "automatisch – Plan B fährt selbst"], CONTROL_MODES.index(ai.get("control_mode", "manual"))
+        if ai.get("control_mode") in CONTROL_MODES else 0, example=str((CONTROL_MODES.index(ai.get("control_mode", "manual")) + 1)
+        if ai.get("control_mode") in CONTROL_MODES else "1"))]
 
     robot = ""
     while True:
@@ -579,9 +726,10 @@ def setup(cfg: dict) -> Setup:
         if choice == len(options) - 1:
             break
 
-    cfg["ai"] = {**ai, "access": access, "model": model["id"], "steering": steering, "robot": robot}
-    return Setup(model["id"], model["name"], model["effort"], steering, robot, token,
-                 float(ai["turn_s"]), int(ai["max_calls"]), int(ai["image_px"]), key)
+    cfg["ai"] = {**ai, "access": "plan_b", "model": "plan_b", "steering": "taktik",
+                 "control_mode": control_mode, "robot": robot}
+    return Setup("plan_b", "Plan B", None, "taktik", control_mode, robot, "",
+                 float(ai["turn_s"]), int(ai["max_calls"]), int(ai["image_px"]), "")
 
 
 # ---------- Kampf ----------
@@ -604,6 +752,47 @@ class Pilot:
         self.bt = Bluetooth(cfg.robot)
         self.heading = Heading()
         self.driver = Driver()
+        self.control_mode = cfg.control_mode
+        self.switch = TerminalSwitch()
+        self._terminal_thread = None
+
+    def set_control_mode(self, mode: str) -> None:
+        if mode in CONTROL_MODES:
+            self.control_mode = mode
+            self.cfg.control_mode = mode
+            log.info("Steuerung: %s", self.control_mode)
+
+    async def _handle_terminal_switch(self) -> None:
+        while True:
+            key = self.switch.pop()
+            if key is None:
+                return
+            if key == "p":
+                self.set_control_mode("auto" if self.control_mode == "manual" else "manual")
+                if self.control_mode == "manual":
+                    await self.bt.send(STOP)
+            elif key == "m":
+                self.set_control_mode("manual")
+                await self.bt.send(STOP)
+            elif key == "a":
+                self.set_control_mode("auto")
+            elif key == " ":
+                self.set_control_mode("manual")
+                self.driver.set("hold", 1)
+                await self.bt.send(STOP)
+            elif key == "r":
+                self.set_control_mode("auto")
+
+    def _start_terminal_switch(self) -> None:
+        if self._terminal_thread is not None and self._terminal_thread.is_alive():
+            return
+        self._terminal_thread = threading.Thread(target=self.switch.run, name="terminal-switch", daemon=True)
+        self._terminal_thread.start()
+
+    def _stop_terminal_switch(self) -> None:
+        self.switch.stop()
+        if self._terminal_thread is not None:
+            self._terminal_thread.join(timeout=1.0)
 
     def post(self, path: str, data: dict) -> tuple[int, dict]:
         req = urllib.request.Request(f"http://{self.server}{path}", data=json.dumps(data).encode(),
@@ -626,6 +815,7 @@ class Pilot:
 
     def public(self) -> dict:
         return {"status": self.status, "model": self.cfg.label, "steering": self.cfg.steering,
+                "control_mode": self.control_mode,
                 "robot": self.cfg.robot or "Probelauf", "bluetooth": self.bt.state, "calls": self.calls,
                 "max_calls": self.cfg.max_calls,
                 "tactic": self.driver.tactic if self.cfg.steering == "taktik" else None,
@@ -638,6 +828,7 @@ class Pilot:
         client = None
         tasks: list[asyncio.Task] = []
         try:
+            self._start_terminal_switch()
             await self.bt.connect()
             self._status("Verbinde KI-Modell …")
             client = self.client_factory(None if self.cfg.api_key else self.cfg.token)
@@ -651,6 +842,7 @@ class Pilot:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            self._stop_terminal_switch()
             await self.bt.close()
             if client is not None:
                 with contextlib.suppress(Exception):
@@ -693,6 +885,25 @@ class Pilot:
         """Schnelle Schleife: Fahrtrichtung schätzen, Taktik fahren und außerhalb des Kampfs anhalten."""
         battle = None
         while True:
+            while True:
+                key = self.switch.pop()
+                if key is None:
+                    break
+                if key == "p":
+                    self.set_control_mode("auto" if self.control_mode == "manual" else "manual")
+                    if self.control_mode == "manual":
+                        await self.bt.send(STOP)
+                elif key == "m":
+                    self.set_control_mode("manual")
+                    await self.bt.send(STOP)
+                elif key == "a":
+                    self.set_control_mode("auto")
+                elif key == " ":
+                    self.set_control_mode("manual")
+                    self.driver.set("hold", 1)
+                    await self.bt.send(STOP)
+                elif key == "r":
+                    self.set_control_mode("auto")
             snap = self.snapshot()
             t = time.monotonic()
             self.heading.update(self.bt.key, snap.me, t)
@@ -701,6 +912,10 @@ class Pilot:
                 self.driver.set("hold", 1)
             if not snap.fighting:
                 await self.bt.send(STOP)
+            elif self.control_mode == "manual":
+                # Manuelle Tasten bleiben der äußeren Steuerung vorbehalten; der Auto-Driver darf hier
+                # nicht die Richtung überschreiben und damit den Menschen ausstecken.
+                pass
             elif self.cfg.steering == "taktik":
                 await self.bt.send(self.driver.key(snap, self.heading, t))
             await asyncio.sleep(WATCH_S)
@@ -831,7 +1046,8 @@ class Pilot:
                         skip_permission=True),
         ]
         if self.cfg.steering == "taktik":
-            return [define_tool("set_tactic", description="Taktik wählen, die der Regler fährt.",
+            return [define_tool("set_tactic", description="Taktik wählen, die der Regler fährt. "
+                                                          "plan_b: automatische Regelsteuerung (Fallback).",
                                 handler=set_tactic, skip_permission=True), *common]
         return [define_tool("drive", description="Kurz fahren oder drehen, danach Stopp.", handler=drive,
                             skip_permission=True),

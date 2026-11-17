@@ -57,6 +57,49 @@ Sind beide Plätze belegt, bietet der Client an, als Bühne zu verbinden. Wer de
 Namen auf demselben Gerät wieder eingibt, bekommt seinen Platz zurück. Beim Schließen
 gibt ein Spieler seinen Platz frei; die Moderation kann Spieler im Tab „Roboter“ entfernen.
 
+### KI-Client Quickstart
+
+```powershell
+cd C:\_dev\HeboShow_KI_Navigator_Nov_2026\hebo-server
+.\.venv\Scripts\python -m hebocon --camera 0
+```
+
+```powershell
+cd C:\_dev\HeboShow_KI_Navigator_Nov_2026\hebo-client
+.\.venv\Scripts\python client.py --server <LAN-IP-aus-server>
+```
+
+Dann in der Client-Konsole:
+
+```text
+name: KI
+```
+
+Danach Roboterauswahl und Startmodus (`manual` oder `auto`) wählen. Der normale KI-Client braucht kein Copilot-/OpenAI-Setup mehr; der Plan-B-Pilot läuft direkt.
+
+Terminal-Steuerung während der Fahrt:
+
+| Taste | Wirkung |
+| --- | --- |
+| `p` | Wechsel zwischen `manual` und `auto` |
+| `m` | Manuell aktivieren |
+| `a` | Automatik aktivieren |
+| `r` | Automatik erneut aktivieren |
+| `Space` | Sofort stoppen / Pause |
+| `w` | Vorwärts (nur im manuellen Modus) |
+| `a` | Links (nur im manuellen Modus) |
+| `s` | Rückwärts (nur im manuellen Modus) |
+| `d` | Rechts (nur im manuellen Modus) |
+
+```text
+p   -> toggelt manual/auto
+space -> Notstopp
+p   -> zurück auf auto
+w/a/s/d -> manuell fahren
+```
+
+Der KI-Client arbeitet ohne Grafik-Fenster; alles läuft in der Konsole.
+
 ### Ohne start.bat
 
 ```powershell

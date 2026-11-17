@@ -6,6 +6,56 @@ Der Client öffnet je nach Rolle Fenster (siehe [01-ueberblick.md](01-ueberblick
 sind Webseiten aus `hebo-client/web/`, die der Client lokal ausliefert und mit dem Server
 verbindet.
 
+## KI-Client
+
+Ein eigener PC lässt den KI-Pilot seinen Roboter fahren. Er öffnet kein Fenster, alles läuft in der Konsole.
+
+### Starten
+
+1. Server starten:
+   ```powershell
+   cd C:\_dev\HeboShow_KI_Navigator_Nov_2026\hebo-server
+   .\.venv\Scripts\python -m hebocon --camera 0
+   ```
+   Die Konsole zeigt die LAN-IP des Servers an. Wenn der Server nicht läuft, findet der Client ihn nicht.
+2. Client starten:
+   ```powershell
+   cd C:\_dev\HeboShow_KI_Navigator_Nov_2026\hebo-client
+   .\.venv\Scripts\python client.py --server <LAN-IP-aus-server>
+   ```
+   Alternativ kann auch `start.bat` gestartet werden; dann fragt der Client nach der Server-IP, falls sie nicht automatisch gefunden wird.
+3. Namen eingeben:
+   * `KI` oder `AI` → KI-Pilot startet mit dem Plan-B-Controller in der Konsole.
+   * `stage` → Bühne.
+   * `mod` oder `moderator` → Moderation mit Passwort.
+   * Jeder andere Name → Spieler.
+4. Danach fragt der KI-Client nur noch nach dem Startmodus und dem Roboter. Es gibt kein Copilot-/OpenAI-Setup mehr im normalen Betrieb.
+   * `manuell`: Externe WASD-Tasten oder eine Handsteuerung bleiben aktiv.
+   * `auto`: Der Plan-B-Pilot fährt sofort selbst.
+   * `Roboter`: Auswahl aus den per Bluetooth gefundenen `hebobot…`-Geräten oder Probelauf ohne Roboter.
+5. Danach meldet er sich als Spieler an und schreibt Verbindungen, Taktikwechsel, Sprüche und Kommentare der KI in die Konsole. `Strg+C` hält den Roboter an und gibt den Platz frei.
+6. Reißt die Verbindung zum Server ab, hält der Roboter nach spätestens 1 s an; der Client verbindet sich von selbst neu. Wird die KI von der Moderation entfernt, beendet er sich.
+
+### Terminal-Steuerung
+
+Die KI läuft in der Konsole und kann während des Betriebs per Tastatur umgeschaltet werden, ohne UI.
+
+| Taste | Wirkung |
+| --- | --- |
+| `p` | Umschalten zwischen `manual` und `auto` |
+| `m` | Manuell aktivieren |
+| `a` | Automatik aktivieren |
+| `r` | Automatik erneut aktivieren / Resume |
+| `Space` | Sofort stoppen / Pause |
+| `w` | Vorwärts (nur im manuellen Modus) |
+| `a` | Links (nur im manuellen Modus) |
+| `s` | Rückwärts (nur im manuellen Modus) |
+| `d` | Rechts (nur im manuellen Modus) |
+
+Die Reihenfolge ist immer genau eine aktive Steuerquelle: entweder `manual` oder `auto`. Das verhindert widersprüchliche Eingaben bei gleichzeitigem Tastatur- und KI-Fahren.
+
+### Beispiel-Start
+
 | Fenster | Seite | Wer | Zweck |
 | --- | --- | --- | --- |
 | Hebocon Bühne | `stage.html` | Publikum, Moderation | Für das Publikum, auf Wunsch Vollbild |
@@ -24,37 +74,8 @@ verbindet.
 4. Die Konsole bleibt offen und meldet, wenn die Verbindung abreißt und wiederkommt.
    Schließen der Fenster beendet den Client; ein Spieler gibt dabei seinen Platz frei.
 
-## KI-Client
-
-Ein eigener PC lässt ein KI-Modell seinen Roboter fahren. Er öffnet kein Fenster,
-alles läuft in der Konsole:
-
-1. Nach `name: KI` fragt er „Womit soll die KI denken?“: „GitHub Copilot“ (über das
-   Copilot-Abo) oder „OpenAI“ (eigener API-Schlüssel, Abrechnung pro Aufruf). Vorgabe ist die
-   Wahl vom letzten Mal, beim ersten Mal OpenAI, wenn `OPENAI_API_KEY` gesetzt ist.
-   * **Copilot:** Er prüft die Copilot-Anmeldung dieses PCs (Copilot-CLI: `copilot`, dann
-     `/login`, oder eine der Variablen `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`).
-     Klappt das nicht, fragt er verdeckt nach einem Token (`github_pat_…` oder `gho_…`;
-     klassische `ghp_…` gehen nicht); leer bricht ab.
-   * **OpenAI:** Er nimmt `OPENAI_API_KEY` oder fragt verdeckt nach dem Schlüssel (`sk-…`)
-     und prüft ihn kostenlos über die Modellliste von OpenAI. Lehnt OpenAI ihn ab, fragt er
-     erneut; leer bricht ab. Der Schlüssel wird nie gespeichert.
-   Beim ersten Start lädt das Copilot-SDK seine Laufzeit nach `%LOCALAPPDATA%\github-copilot-sdk`.
-   Sperrt der Virenscanner die frischen Dateien, versucht er es bis zu dreimal; danach meldet er,
-   den Ordner vom Scanner auszunehmen, und fragt wieder nach dem Namen.
-2. Er fragt nacheinander mit Nummernauswahl: Modell (nur Modelle mit Bildverständnis; bei
-   Copilot mit Premium-Faktor „×n“, bei OpenAI die Familien GPT-4o, GPT-4.1, GPT-5 und neuer
-   sowie o4 und neuer, ohne Sprach-, Bild-, Such-, Codex- und Pro-Varianten; Vorgabe beim
-   ersten Mal `gpt-4.1-mini`), Steuerung „taktik“ (empfohlen: die KI wählt ein Manöver, ein
-   Regler auf dem KI-PC fährt es) oder „direkt“ (die KI drückt die Tasten selbst), und den
-   Roboter aus den per Bluetooth gefundenen `hebobot…`, „Erneut suchen“ oder „Probelauf ohne
-   Roboter“ (Tasten nur in der Konsole). Enter nimmt die Vorgabe vom letzten Mal aus `client.json`.
-3. Danach meldet er sich als Spieler an und schreibt Verbindungen, Taktikwechsel, Sprüche
-   und Kommentare der KI in die Konsole. Strg+C hält den Roboter an und gibt den Platz frei.
-4. Reißt die Verbindung zum Server ab, hält der Roboter nach spätestens 1 s an; der Client
-   verbindet sich von selbst neu. Wird die KI von der Moderation entfernt, beendet er sich.
-
-## Bedienung
+cd C:\_dev\HeboShow_KI_Navigator_Nov_2026\hebo-server
+.\.venv\Scripts\python -m hebocon --camera 0
 
 Optik nach `hebo-client/design-reference/moderator (1).html`: Hintergrund `#090f1b`, zwei
 Paneele mit blauem Verlauf, orange Akzente. Kopfzeile „MODERATOR CONTROL“ mit Untertitel,

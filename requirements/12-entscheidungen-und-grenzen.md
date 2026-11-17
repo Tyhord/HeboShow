@@ -211,3 +211,205 @@ wohin er sich bei Vorwärtsfahrt bewegt; so braucht es keinen Marker auf dem Rob
   angenommen, nicht gemessen.
 * **Eine KI je PC.** Wer zwei KIs kämpfen lassen will, braucht zwei KI-PCs mit je eigenem
   Roboter in Bluetooth-Reichweite.
+
+## Plan B: visuelle Zustandslogik statt Training
+
+**Ziel:** Einen Roboter ohne Training, ohne GPU und ohne zusätzliche Sensoren autonom fahren,
+indem nur die bereits vorhandenen Video- und Tracking-Daten verwendet werden. Die Logik bleibt
+leichtgewichtig, erklärt und schnell genug für Hebocon.
+
+**Warum B statt C:** Ein trainiertes Modell würde auf einer normalen Laptop-KI oder einem
+kurzen Stimulus nicht stabil genug reagieren, weil es keinen IMU, kein Lidar, keine
+Distanzsensoren und keine echten Bodenwerte hat. Die Arena ist zwar gut in der Kamera
+modelliert, aber die Entscheidung muss auf einem klaren, kurzen Zustandsvektor und nicht auf
+„Eingangsvideo → Output-Aktion“ beruhen. Das ist für den ersten echten Betrieb deutlich
+robuster.
+
+### Grundprinzip
+
+1. Das Tracking liefert laufend den Zustandsvektor.
+2. Ein kleiner, deterministischer Strategiemodul wählt den nächsten Fahrmodus.
+3. Ein kurzer Aktuator-Block übersetzt den Modus in Tastendrücke oder kurze Impulse.
+4. Das System prüft nach jeder Bewegung, ob der Zustand noch sicher ist und wechselt bei
+   Bedarf sofort in Rettungs-/Sicherheitsmodus.
+
+So bleiben die Reaktionszeiten klein und die Logik offen genug, damit sie im späteren Code
+schnell überprüfbar bleibt.
+
+### Zustandsdaten
+
+Der Modus sieht nur die vorhandenen Tracker-Daten und die Arena-Informationen:
+
+* eigene Position und Geschwindigkeit
+* Position und Geschwindigkeit des Gegners
+* Abstand zu den Arenarändern
+* Abstand zum Gegner
+* Nähe zu Hindernissen oder Power-ups, falls sichtbar
+* bisherige Fahrtrichtung / Einschätzung der Front
+* Status „sicher“, „drängend“, „am Rand“, „verloren“, „in Kollision“
+
+Die KI soll dabei nicht auf Rohbildern operieren, sondern auf einem klaren Zustandsvektor.
+Das macht sie schnell, leicht testbar und auf schwacher Hardware nutzbar.
+
+### Zustandsmuster
+
+Die Strategie arbeitet nur mit wenigen, klaren Zustandsmustern:
+
+* `attack`: Gegner ist nah und erreichbar, wir wollen ihn schieben oder rammen.
+* `flank`: Gegner ist im Weg, aber eine direkte Ramme wäre schlecht; eine seitliche
+  Annäherung ist vorteilhafter.
+* `retreat`: wir verlieren Abstand, stehen am Rand, oder der Gegner ist zu dominant.
+* `edge_safe`: wir sind am Rand oder der Ecke zu nahe; Sicherheit hat Vorrang.
+* `dodge`: wir vermeiden Kollision, Kanten oder ein zu enges Winkelspiel.
+* `hold`: keine sichere Entscheidung; kurz stillhalten und neu bewerten.
+
+Nur diese sechs Zustände werden im ersten Plan verwendet. Mehr ist in der ersten Version nicht
+notwendig und würde die Laufzeit unnötig erhöhen.
+
+### Entscheidungslogik
+
+Die Auswahl des Zustands folgt einer festen Priorität, nicht einer „intelligenten“ freien
+Entscheidung:
+
+1. `edge_safe` hat Vorrang.
+   * Wenn wir uns an der Kante oder in einer Ecke befinden, ist das sicherste Verhalten
+     sofort: Abstand aufbauen, weg von der Kante, kurz zurück oder seitlich weg.
+2. `dodge` hat Vorrang vor `attack`.
+   * Wenn der Gegner auf einer sehr schlechten Linie steht, der Winkel zu eng ist oder eine
+     Kollision droht, wird zielsicher ausgewichen.
+3. `retreat` hat Vorrang wenn ein unmittelbarer Druck zu groß wird.
+   * Wenn der Gegner zu nah ist und die Ecke droht, wird Abstand gewonnen.
+4. `flank` ersetzt `attack`, wenn eine direkte Ramme zu riskant wäre.
+   * Besonders bei halb zugeschlagenem Winkel gegen die Seite.
+5. `attack` ist der Standardfall.
+   * Wenn der Gegner nah genug und sicher erreichbar ist, wird aktiv auf ihn zugefahren.
+6. `hold` nur als Notfall.
+   * Wenn die Zielerkennung fehlt, der Gegner verschwindet aus dem Bild oder die Lage zu
+     unklar ist, bleibt der Roboter kurz stehen und bewertet neu.
+
+Es gibt damit nie eine rätselhafte „AI-Entscheidung“ ohne klare Zustandsgründe. Das ist ein
+Entscheidungsmerkmal, das später leicht testbar ist.
+
+### Aktuator-Block
+
+Der Modus erzeugt keine „komplexen“ Befehle, sondern nur kurze, gut definierte Impulse:
+
+* `forward`: 0,2 bis 0,5 s
+* `backward`: 0,2 bis 0,6 s
+* `left spin`: 0,15 bis 0,45 s
+* `right spin`: 0,15 bis 0,45 s
+* `stop`: 0,1 bis 0,2 s
+
+Die Reihenfolge ist bewusst kurz. Ein Hebocon-Roboter ist in der Arena so schnell, dass ein
+zu langer Fahrbefehl unnötig und eher gefährlich wird: er verschiebt das Fahrzeug in einen
+unübersichtlichen Zustand. Deshalb bleiben alle Kommandos kurz und wiederholbar.
+
+### Sicherheitsregeln
+
+Im ersten Plan gelten feste Sicherheitsregeln:
+
+* Wenn die Distanz zur Arena-Kante unter Mindestwert fällt, sofort `edge_safe`.
+* Wenn die Frontrichtung unbekannt ist, zuerst kurz vorwärts fahren und danach neu bewerten.
+* Wenn der Kontakt- oder Zielzustand für zwei oder drei Zyklen verloren ist, nicht mehr
+  aggressiv aufdrängen, sondern in `hold` oder `retreat` gehen.
+* Wenn die Umgebung unklar ist, nie „blind“ in die Ecke fahren.
+
+Das ist wichtig, weil Hebocon in der Randzone deutlich schneller verloren geht als in der Mitte.
+
+### Reaktionszeitbudget
+
+Das Design hält sich an ein strenges Zeitbudget:
+
+* Bild-/Tracking-Update: 20 bis 50 ms
+* Zustandsberechnung: 1 bis 5 ms
+* Moduswechsel und Befehlsbildung: 1 bis 5 ms
+* Bluetooth-/Netzwerk-Latenz im LAN: 10 bis 50 ms
+* Gesamt: etwa 50 bis 200 ms in guten Fällen
+
+Die erste Version soll unter 300 ms bleiben. Wenn die Gesamtzeit dauerhaft über 500 ms steigt,
+ist das System zu langsam für eine aggressivere Regelstrategie und muss auf einen einfacheren,
+mehr vorhersagbaren Modus zurückfallen.
+
+### Phasen der Umsetzung
+
+#### Phase 1: Grundlagen festigen
+
+* Roboter- und Gegnerposition aus dem bestehenden Tracking verwenden.
+* Arena-Rand und Mindestabstand als Schutzkriterien einbauen.
+* Ein erster sicherer `hold`- und `edge_safe`-Modus.
+* Testen, ob die Roboter ohne Kollision die Arena sauber verlassen und wieder zurückkehren.
+
+Ergebnis: Der Roboter fährt stabil, auch wenn kein Angriffsplan aktiv ist.
+
+#### Phase 2: Angriff und Seitenzugang
+
+* Angriff auf Gegner nur, wenn Abstand und Winkel sicher sind.
+* `flank` wird eingebaut, wenn direkte Bewegung zu eng wird.
+* Zwei bis drei kurze Impulse pro Entscheidungszyklus statt einer langen Fahrt.
+
+Ergebnis: Der Roboter drängt aktiv, aber nicht blind.
+
+#### Phase 3: Abwehr und Kollision vermeiden
+
+* Ausweichlogik für Kollisionen und enge Winkel.
+* `dodge` wird öfter aktiviert, wenn der Gegner in einer sehr schlechten Linie ist.
+* Wiederholtes Abfragen, ob die Lage noch sicher ist.
+
+Ergebnis: Der Roboter bleibt in der Mitte und verhindert hängende oder ruckartige
+Verhaltensschleifen.
+
+#### Phase 4: Verhaltensmuster erweitern
+
+* `retreat` und `flank` werden fein abgestimmt.
+* Unterschiedliche Prioritäten je nach HP oder Arena-Grad.
+* Leichte Zufälligkeit nur in nicht kritischen Situationen, damit sich der Weg nicht zu
+  repetitiv anfühlt.
+
+Ergebnis: Der Roboter wirkt nicht mehr nur wie ein „pingpongender Regelautomat“, sondern wie
+eine einfache, aber passende Strategie.
+
+#### Phase 5: Evaluierung
+
+* Reaktionszeit messen.
+* Kollisionen zählen.
+* Ringout-Vermeidungsrate prüfen.
+* Wie oft der Roboter am Rand sitzt, dokumentieren.
+* Falls die Stabilität schlecht bleibt, zurück auf Phase 1 mit verstärkter Sicherheitslogik.
+
+Ergebnis: Die Logik bleibt in der Regel stabil und nicht „zu clever“ für die Hardware.
+
+### Was nicht Teil dieses Plans ist
+
+* kein Training auf Bilddaten
+* kein RL oder Simulationslernen in der ersten Version
+* keine GPU-abhängige Objekt-Erkennung
+* keine direkte Regelung auf den Rohpixeln
+* keine Annahme, dass der Roboter echte Sensoren hat
+
+Das ist absichtlich so. Das Ziel ist nicht, die „best mögliche AI“ zu bauen, sondern eine
+betriebssichere, verständliche, billig laufende Fahrstrategie für dieses Projekt.
+
+### Akzeptanzkriterien für den ersten Erfolg
+
+Der Plan gilt als erfolgreich, wenn folgendes erreicht ist:
+
+* Roboter bleibt in der Arena und fährt nicht ins Nirgendwo.
+* Der Roboter drängt den Gegner aktiv an, ohne ständig an die Kante zu geraten.
+* Eine Kollision oder ein anstehender Randverlust löst sofort ein Sicherheitsverhalten aus.
+* Reaktionszeit bleibt unter 300 ms in normalen Fällen.
+* Die Logik ist in klaren Zuständen nachvollziehbar, ohne Black-Box-Anteile.
+
+Wenn diese Kriterien erreicht sind, ist die technische Basis für spätere Verbesserungen da.
+Dann kann man gezielt über mehr Komplexität, bessere Winkel-Logik oder optionales ML nachdenken,
+ohne das gesamte System zu gefährden.
+
+### Abschlussurteil
+
+Der erste reale Plan für dieses Projekt ist kein „Modell schaut und entscheidet“, sondern ein
+„visueller Zustandsregler mit klaren Modi“. Das passt zu den vorhandenen Mitteln, zum
+sql/technischen Design und zur Performance-Zielsetzung dieses Projekts.
+
+B ist damit die richtige erste Baustufe. Wenn der zeitliche Rahmen und die Stabilität nicht
+passen, fällt der Roboter auf den noch einfacheren A-Plan zurück. C bleibt nicht der nächste
+Schritt, sondern ein späteres, optionales Upgrade, wenn schon eine stabile Regelbasis läuft.
+
