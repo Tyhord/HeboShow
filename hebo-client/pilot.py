@@ -14,7 +14,9 @@ import json
 import logging
 import math
 import os
+import random
 import re
+import socket
 import sys
 import threading
 import time
@@ -23,6 +25,11 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Literal
+
+import cv2
+import numpy as np
+from pydantic import BaseModel, Field
+
 
 class TerminalSwitch:
     """Hält eine kleine Tasten-Queue für den Laufzeit-Wechsel zwischen manuell und auto bereit."""
@@ -58,22 +65,10 @@ class TerminalSwitch:
                         key = msvcrt.getwch()
                         if key in ("p", "P"):
                             self.push("p")
-                        elif key == " ":
-                            self.push(" ")
-                        elif key in ("m", "M"):
-                            self.push("m")
-                        elif key in ("a", "A"):
-                            self.push("a")
-                        elif key in ("r", "R"):
-                            self.push("r")
                 time.sleep(0.05)
             except Exception:
                 self._stopped.set()
                 break
-
-import cv2
-import numpy as np
-from pydantic import BaseModel, Field
 
 log = logging.getLogger("pilot")
 
@@ -93,8 +88,21 @@ OPENAI_SKIP = re.compile(r"audio|realtime|tts|transcribe|search|image|codex|-pro
                          r"|\d{4}-\d{2}-\d{2}")
 # Diese Familien denken vor jeder Antwort; „low“ hält sie im Kampf schnell genug.
 OPENAI_REASONING = re.compile(r"^(gpt-[5-9]|o\d)")
-DEFAULTS = {"access": "", "model": "", "steering": "taktik", "robot": "", "control_mode": "manual",
-            "turn_s": 1.5, "max_calls": 200, "image_px": 512}
+DEFAULTS = {
+    "access": "",
+    "model": "",
+    "steering": "taktik",
+    "robot": "",
+    "control_mode": "manual",
+    "turn_s": 1.5,
+    "max_calls": 200,
+    "image_px": 512,
+    "controller_host": "127.0.0.1",
+    "controller_port": 18899,
+    "auto_wait_s": 10.0,
+    "foe_start_speed": 45.0,
+    "foe_start_frames": 3,
+}
 WATCH_S = 0.05
 STATUS_S = 2.0
 # Älterer Zustand heißt: Server weg. Dann lieber anhalten als nach altem Bild weiterfahren.
@@ -158,6 +166,11 @@ class Setup:
     image_px: int = 512
     # Gesetzt = eigener OpenAI-Schlüssel statt Copilot; wird nie gespeichert.
     api_key: str = ""
+    controller_host: str = ""
+    controller_port: int = 18899
+    auto_wait_s: float = 10.0
+    foe_start_speed: float = 45.0
+    foe_start_frames: int = 3
 
 
 # ---------- Lagebild aus dem Serverzustand ----------
@@ -292,6 +305,47 @@ class Bluetooth:
         if self.client is not None:
             with contextlib.suppress(Exception):
                 await self.client.disconnect()
+
+
+class ControllerLink:
+    """Leitet Fahrbefehle als UDP-Pakete an den HeboController weiter."""
+
+    def __init__(self, host: str, port: int):
+        self.host = host
+        self.port = port
+        self.key = STOP
+        self._seq = 0
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    @property
+    def state(self) -> str:
+        return f"Controller {self.host}:{self.port}"
+
+    async def connect(self) -> None:
+        return
+
+    async def mode(self, mode: str) -> None:
+        self._send({"type": "mode", "mode": mode})
+
+    async def send(self, key: str, force: bool = False) -> None:
+        if key == self.key and not force:
+            return
+        if key == STOP:
+            self._send({"type": "stop"})
+        else:
+            self._send({"type": "drive", "key": key})
+        self.key = key
+
+    async def close(self) -> None:
+        with contextlib.suppress(Exception):
+            await self.send(STOP, force=True)
+        with contextlib.suppress(Exception):
+            self._sock.close()
+
+    def _send(self, data: dict) -> None:
+        self._seq += 1
+        packet = {"seq": self._seq, "source": "pilot", "ts_ms": int(time.time() * 1000), **data}
+        self._sock.sendto(json.dumps(packet).encode("utf-8"), (self.host, self.port))
 
 
 class Heading:
@@ -700,36 +754,50 @@ def _choose(title: str, options: list[str], default: int, *, example: str | None
         print(f"Bitte eine Zahl von 1 bis {len(options)} eingeben.")
 
 
-def setup(cfg: dict) -> Setup:
-    """Fragt nur noch Roboter und Startmodus ab; Plan B fährt ohne LLM-Modell."""
+def setup(cfg: dict, forced_controller: str | None = None) -> Setup:
+    """Fragt Startmodus und Controller-Endpunkt ab; Plan B fährt ohne LLM-Modell."""
     ai = {**DEFAULTS, **cfg.get("ai", {})}
+    mode_default = ai.get("control_mode", "manual")
+    default_index = CONTROL_MODES.index(mode_default) if mode_default in CONTROL_MODES else 0
     control_mode = CONTROL_MODES[_choose("Wie startet die Steuerung?", [
         "manuell – externe WASD-Tasten oder Handsteuerung",
-        "automatisch – Plan B fährt selbst"], CONTROL_MODES.index(ai.get("control_mode", "manual"))
-        if ai.get("control_mode") in CONTROL_MODES else 0, example=str((CONTROL_MODES.index(ai.get("control_mode", "manual")) + 1)
-        if ai.get("control_mode") in CONTROL_MODES else "1"))]
+        "automatisch – Plan B fährt selbst"], default_index, example=str(default_index + 1))]
 
-    robot = ""
+    if forced_controller:
+        text = forced_controller.strip()
+        if ":" in text:
+            host_part, port_part = text.rsplit(":", 1)
+            if host_part:
+                ai["controller_host"] = host_part
+            if port_part.isdigit() and 1 <= int(port_part) <= 65535:
+                ai["controller_port"] = int(port_part)
+        elif text:
+            ai["controller_host"] = text
+
+    host_default = str(ai.get("controller_host") or DEFAULTS["controller_host"])
     while True:
-        print("Suche Roboter per Bluetooth …")
-        try:
-            found = asyncio.run(_scan())
-        except Exception as exc:
-            print(f"Bluetooth geht auf diesem PC nicht ({exc}). Nur ein Probelauf ist möglich.")
-            found = []
-        options = [*found, "Erneut suchen", "Probelauf ohne Roboter (Tasten nur in der Konsole)"]
-        default = found.index(ai["robot"]) if ai["robot"] in found else (0 if found else len(options) - 1)
-        choice = _choose("Welchen Roboter steuert die KI?", options, default)
-        if choice < len(found):
-            robot = found[choice]
+        host = input(f"Controller-IP [{host_default}]: ").strip() or host_default
+        if host:
             break
-        if choice == len(options) - 1:
+        print("Bitte eine IP oder einen Hostnamen eingeben.")
+
+    port_default = int(ai.get("controller_port") or DEFAULTS["controller_port"])
+    while True:
+        text = input(f"Controller-Port [{port_default}]: ").strip()
+        if not text:
+            port = port_default
             break
+        if text.isdigit() and 1 <= int(text) <= 65535:
+            port = int(text)
+            break
+        print("Bitte einen Port von 1 bis 65535 eingeben.")
 
     cfg["ai"] = {**ai, "access": "plan_b", "model": "plan_b", "steering": "taktik",
-                 "control_mode": control_mode, "robot": robot}
-    return Setup("plan_b", "Plan B", None, "taktik", control_mode, robot, "",
-                 float(ai["turn_s"]), int(ai["max_calls"]), int(ai["image_px"]), "")
+                 "control_mode": control_mode, "robot": "", "controller_host": host,
+                 "controller_port": port}
+    return Setup("plan_b", "Plan B", None, "taktik", control_mode, "", "",
+                 float(ai["turn_s"]), int(ai["max_calls"]), int(ai["image_px"]), "", host, port,
+                 float(ai["auto_wait_s"]), float(ai["foe_start_speed"]), int(ai["foe_start_frames"]))
 
 
 # ---------- Kampf ----------
@@ -750,9 +818,18 @@ class Pilot:
         self.calls = 0
         self.comment = ""
         self.bt = Bluetooth(cfg.robot)
+        self.ctrl = ControllerLink(cfg.controller_host, cfg.controller_port) if cfg.controller_host else None
         self.heading = Heading()
         self.driver = Driver()
         self.control_mode = cfg.control_mode
+        self.drive_key = STOP
+        self.auto_started = 0.0
+        self.auto_ready = False
+        self.foe_started = False
+        self.foe_frames = 0
+        self.patrol_key = STOP
+        self.patrol_until = 0.0
+        self.wait_notice_left = -1
         self.switch = TerminalSwitch()
         self._terminal_thread = None
 
@@ -762,26 +839,93 @@ class Pilot:
             self.cfg.control_mode = mode
             log.info("Steuerung: %s", self.control_mode)
 
+    async def _send_key(self, key: str, force: bool = False) -> None:
+        target = self.ctrl or self.bt
+        await target.send(key, force=force)
+        self.drive_key = target.key
+
+    async def _set_mode(self, mode: str) -> None:
+        if mode not in CONTROL_MODES or mode == self.control_mode:
+            return
+        self.set_control_mode(mode)
+        if self.ctrl is not None:
+            await self.ctrl.mode(mode)
+        # Der Wechsel stoppt bewusst zuerst den alten Dauerbefehl.
+        await self._send_key(STOP, force=True)
+        self.auto_started = 0.0
+        self.auto_ready = False
+        self.foe_started = False
+        self.foe_frames = 0
+
+    def _update_auto_gate(self, snap: Snapshot, t: float) -> None:
+        if self.control_mode != "auto" or not snap.fighting:
+            self.auto_started = 0.0
+            self.auto_ready = False
+            self.foe_started = False
+            self.foe_frames = 0
+            self.wait_notice_left = -1
+            return
+        if self.auto_started <= 0.0:
+            self.auto_started = t
+            self.wait_notice_left = -1
+        if not snap.foe.present:
+            self.auto_ready = True
+            self.wait_notice_left = -1
+            return
+        speed = float(np.linalg.norm(snap.foe.vel))
+        if speed >= self.cfg.foe_start_speed:
+            self.foe_frames += 1
+        else:
+            self.foe_frames = 0
+        if self.foe_frames >= self.cfg.foe_start_frames:
+            self.foe_started = True
+            self.wait_notice_left = -1
+        if self.foe_started or (t - self.auto_started) >= self.cfg.auto_wait_s:
+            self.auto_ready = True
+            self.wait_notice_left = -1
+
+    def _log_wait_countdown(self, t: float) -> None:
+        if self.auto_ready or self.auto_started <= 0.0:
+            self.wait_notice_left = -1
+            return
+        left = max(0, math.ceil(self.cfg.auto_wait_s - (t - self.auto_started)))
+        if left != self.wait_notice_left:
+            self.wait_notice_left = left
+            log.info("Auto-Start in %d s (oder sofort, sobald der Gegner fährt).", left)
+
+    def _patrol(self, snap: Snapshot, t: float) -> str:
+        me = snap.me
+        if not me.present or snap.bounds is None:
+            return STOP
+        if self.patrol_until > t:
+            return self.patrol_key
+        x0, y0, x1, y1 = snap.bounds
+        margin = me.radius + EDGE_MARGIN
+        near_edge = not (x0 + margin < me.pos[0] < x1 - margin and y0 + margin < me.pos[1] < y1 - margin)
+        close_obstacle = any(
+            kind == "obstacle" and float(np.linalg.norm(pos - me.pos)) < me.radius + radius + 80
+            for kind, pos, radius in snap.items
+        )
+        if near_edge:
+            key = random.choice(("s", "a", "d"))
+            dur = random.uniform(0.2, 0.45)
+        elif close_obstacle:
+            key = random.choice(("a", "d", "s"))
+            dur = random.uniform(0.15, 0.35)
+        else:
+            key = random.choices(("w", "a", "d", "s", STOP), weights=(6, 2, 2, 2, 1), k=1)[0]
+            dur = random.uniform(0.2, 0.6)
+        self.patrol_key = key
+        self.patrol_until = t + dur
+        return key
+
     async def _handle_terminal_switch(self) -> None:
         while True:
             key = self.switch.pop()
             if key is None:
                 return
             if key == "p":
-                self.set_control_mode("auto" if self.control_mode == "manual" else "manual")
-                if self.control_mode == "manual":
-                    await self.bt.send(STOP)
-            elif key == "m":
-                self.set_control_mode("manual")
-                await self.bt.send(STOP)
-            elif key == "a":
-                self.set_control_mode("auto")
-            elif key == " ":
-                self.set_control_mode("manual")
-                self.driver.set("hold", 1)
-                await self.bt.send(STOP)
-            elif key == "r":
-                self.set_control_mode("auto")
+                await self._set_mode("auto" if self.control_mode == "manual" else "manual")
 
     def _start_terminal_switch(self) -> None:
         if self._terminal_thread is not None and self._terminal_thread.is_alive():
@@ -816,10 +960,12 @@ class Pilot:
     def public(self) -> dict:
         return {"status": self.status, "model": self.cfg.label, "steering": self.cfg.steering,
                 "control_mode": self.control_mode,
-                "robot": self.cfg.robot or "Probelauf", "bluetooth": self.bt.state, "calls": self.calls,
+                "robot": self.cfg.robot or ("Controller" if self.ctrl else "Probelauf"),
+                "bluetooth": (self.ctrl.state if self.ctrl else self.bt.state),
                 "max_calls": self.cfg.max_calls,
                 "tactic": self.driver.tactic if self.cfg.steering == "taktik" else None,
-                "key": self.bt.key.strip() or None, "comment": self.comment, "error": self.error}
+                "key": self.drive_key.strip() or None, "comment": self.comment, "error": self.error,
+                "calls": self.calls}
 
     def snapshot(self) -> Snapshot:
         return snapshot_from(self.state, self.slot, time.monotonic() - self.received < STALE_S)
@@ -829,7 +975,12 @@ class Pilot:
         tasks: list[asyncio.Task] = []
         try:
             self._start_terminal_switch()
-            await self.bt.connect()
+            if self.ctrl is not None:
+                await self.ctrl.connect()
+                await self.ctrl.mode(self.control_mode)
+                await self._send_key(STOP, force=True)
+            else:
+                await self.bt.connect()
             self._status("Verbinde KI-Modell …")
             client = self.client_factory(None if self.cfg.api_key else self.cfg.token)
             await client.start()
@@ -843,7 +994,10 @@ class Pilot:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             self._stop_terminal_switch()
-            await self.bt.close()
+            if self.ctrl is not None:
+                await self.ctrl.close()
+            else:
+                await self.bt.close()
             if client is not None:
                 with contextlib.suppress(Exception):
                     await client.stop()
@@ -890,34 +1044,32 @@ class Pilot:
                 if key is None:
                     break
                 if key == "p":
-                    self.set_control_mode("auto" if self.control_mode == "manual" else "manual")
-                    if self.control_mode == "manual":
-                        await self.bt.send(STOP)
-                elif key == "m":
-                    self.set_control_mode("manual")
-                    await self.bt.send(STOP)
-                elif key == "a":
-                    self.set_control_mode("auto")
-                elif key == " ":
-                    self.set_control_mode("manual")
-                    self.driver.set("hold", 1)
-                    await self.bt.send(STOP)
-                elif key == "r":
-                    self.set_control_mode("auto")
+                    await self._set_mode("auto" if self.control_mode == "manual" else "manual")
             snap = self.snapshot()
             t = time.monotonic()
-            self.heading.update(self.bt.key, snap.me, t)
+            self._update_auto_gate(snap, t)
+            self.heading.update(self.drive_key, snap.me, t)
             if snap.battle != battle:
                 battle = snap.battle
                 self.driver.set("hold", 1)
-            if not snap.fighting:
-                await self.bt.send(STOP)
-            elif self.control_mode == "manual":
+                self.auto_started = 0.0
+                self.auto_ready = False
+                self.foe_started = False
+                self.foe_frames = 0
+            if self.control_mode == "manual":
                 # Manuelle Tasten bleiben der äußeren Steuerung vorbehalten; der Auto-Driver darf hier
                 # nicht die Richtung überschreiben und damit den Menschen ausstecken.
                 pass
+            elif not snap.fighting:
+                await self._send_key(STOP)
+            elif not self.auto_ready:
+                self._log_wait_countdown(t)
+                await self._send_key(STOP)
+            elif snap.foe.present and not self.foe_started:
+                # Solange der Gegner noch steht, patrouilliert die KI nur und vermeidet voreilige Angriffe.
+                await self._send_key(self._patrol(snap, t))
             elif self.cfg.steering == "taktik":
-                await self.bt.send(self.driver.key(snap, self.heading, t))
+                await self._send_key(self.driver.key(snap, self.heading, t))
             await asyncio.sleep(WATCH_S)
 
     async def _report(self) -> None:
@@ -1011,15 +1163,15 @@ class Pilot:
             if not self.snapshot().fighting:
                 return "Gerade läuft kein Kampf; die Motoren bleiben aus."
             key = {"forward": "w", "back": "s", "left": "a", "right": "d"}[args.direction]
-            await self.bt.send(key)
+            await self._send_key(key)
             end = time.monotonic() + args.ms / 1000
             while time.monotonic() < end and self.snapshot().fighting:
                 await asyncio.sleep(WATCH_S)
-            await self.bt.send(STOP)
+            await self._send_key(STOP)
             return "Erledigt. " + self.position(self.snapshot())
 
         async def stop() -> str:
-            await self.bt.send(STOP)
+            await self._send_key(STOP)
             return "Angehalten."
 
         async def set_tactic(args: TacticArgs) -> str:
@@ -1094,6 +1246,9 @@ def run(server: str, result: dict, cfg: Setup) -> None:
     for noisy in ("websockets", "bleak", "copilot"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     pilot = Pilot(server, result["token"], result["slot"], cfg)
+    robot_label = (cfg.robot or
+                   (f"Controller {cfg.controller_host}:{cfg.controller_port}" if cfg.controller_host
+                    else "Probelauf"))
     log.info("KI %s steuert Roboter %d (%s, %s). Beenden mit Strg+C.", cfg.label, result["slot"],
-             cfg.robot or "Probelauf", cfg.steering)
+             robot_label, cfg.steering)
     asyncio.run(pilot.main())

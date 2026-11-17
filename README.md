@@ -75,28 +75,31 @@ Dann in der Client-Konsole:
 name: KI
 ```
 
-Danach Roboterauswahl und Startmodus (`manual` oder `auto`) wählen. Der normale KI-Client braucht kein Copilot-/OpenAI-Setup mehr; der Plan-B-Pilot läuft direkt.
+Danach Startmodus (`manual` oder `auto`) und Controller-Endpunkt (`IP:Port`, Standard
+`127.0.0.1:18899`) wählen. Der normale KI-Client braucht kein Copilot-/OpenAI-Setup mehr;
+der Plan-B-Pilot läuft direkt.
+
+Der Controller läuft separat, z. B.:
+
+```powershell
+cd C:\_dev\HeboShow_KI_Navigator_Nov_2026\HeboController\controller
+python load.py 1 --listen-host 127.0.0.1 --listen-port 18899 --start-mode manual
+```
 
 Terminal-Steuerung während der Fahrt:
 
 | Taste | Wirkung |
 | --- | --- |
-| `p` | Wechsel zwischen `manual` und `auto` |
-| `m` | Manuell aktivieren |
-| `a` | Automatik aktivieren |
-| `r` | Automatik erneut aktivieren |
-| `Space` | Sofort stoppen / Pause |
-| `w` | Vorwärts (nur im manuellen Modus) |
-| `a` | Links (nur im manuellen Modus) |
-| `s` | Rückwärts (nur im manuellen Modus) |
-| `d` | Rechts (nur im manuellen Modus) |
+| `p` | Wechsel zwischen `manual` und `auto`; beim Wechsel schickt die KI einmal `stop` |
 
-```text
-p   -> toggelt manual/auto
-space -> Notstopp
-p   -> zurück auf auto
-w/a/s/d -> manuell fahren
-```
+Im Modus `manual` gilt nur die lokale WASD-Tastatur im `load.py`. Im Modus `auto` sind lokale
+WASD im Controller gesperrt; die KI schickt stattdessen UDP-Befehle (`drive`/`stop`).
+
+Auto-Start:
+
+* Ohne zweiten sichtbaren Roboter patrouilliert die KI zufällig und meidet Rand/Hindernisse.
+* Mit Gegner wartet sie auf dessen Bewegung oder höchstens 10 s.
+* Nach 10 s startet sie ebenfalls, vermeidet aber Angriffe, bis der Gegner sich erkennbar bewegt.
 
 Der KI-Client arbeitet ohne Grafik-Fenster; alles läuft in der Konsole.
 

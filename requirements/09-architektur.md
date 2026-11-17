@@ -9,7 +9,8 @@ KI-Client (GitHub Copilot oder OpenAI) auf seinem eigenen PC:
   Balancing, Spieler und alle gespeicherten Daten. Läuft nur als Konsole.
 * **`hebo-client/`**: Anmeldung, Fenster und Seiten. Rechnet nichts am Spiel, zeigt nur den
   Zustand des Servers und schickt Aktionen. Beliebig oft auf beliebigen Geräten. Mit dem
-  Namen `KI` wird er zum KI-Client: ohne Fenster, mit KI-Modell und Bluetooth zum eigenen Roboter.
+  Namen `KI` wird er zum KI-Client: ohne Fenster, mit KI-Modell und UDP-Fahrbefehlen an den
+  lokalen `HeboController`.
 
 ## Bausteine Server
 
@@ -38,7 +39,7 @@ KI-Client (GitHub Copilot oder OpenAI) auf seinem eigenen PC:
 | Datei | Aufgabe |
 | --- | --- |
 | `client.py` | Server suchen oder IP abfragen, `name:` und Passwort abfragen, anmelden, Seiten lokal ausliefern, pywebview-Fenster öffnen, Verbindung überwachen; bei `KI`/`AI` stattdessen `pilot.py` starten |
-| `pilot.py` | KI-Client: Zugang (Copilot oder OpenAI-Schlüssel) und Modellwahl, Bluetooth zum Roboter, WebSocket mit Bild, Lagebild und Bild ans Modell, Werkzeuge, Taktik-Regler, Status an den Server |
+| `pilot.py` | KI-Client: Startmodus und Controller-Endpunkt, WebSocket mit Bild, Lagebild und Bild ans Modell, Taktik-Regler, UDP-Fahrbefehle (`mode`/`drive`/`stop`) an `HeboController`, Status an den Server |
 | `web/common.js` | Serveradresse und Token aus der URL, `api()`, `connect()`, Zeichnen |
 | `web/stage.html` | Bühne; beim Spieler zusätzlich eigener Ulti-Knopf und Wenig-HP-Vignette |
 | `web/operator.html` | Bedienung |
@@ -71,7 +72,7 @@ Kamera ─► process ─► Tracker.update ─► Game.tick ─► Paket (Zusta
                                    WebSocket ─► alle Clients (Bühne, Bedienung, Spieler)
 Bedienung/Spieler ─► POST /api/<aktion> (Bearer-Token) ─► Rechte prüfen ─► App.act
 Client-Start ─► UDP-Suche ─► POST /lobby/join ─► Token ─► Fenster mit ?server=…&token=…
-WebSocket (frames=1) ─► KI-Client ─► Modell (Bild + Lage) ─► Werkzeuge ─► Bluetooth ─► Roboter
+WebSocket (frames=1) ─► KI-Client ─► Modell (Bild + Lage) ─► Taktik ─► UDP ─► HeboController ─► Bluetooth ─► Roboter
                                                                    └─► POST /api/ulti, say, ai_status
 ```
 
@@ -81,7 +82,8 @@ Die Seiten zeichnen nur, gerechnet wird im Server.
 ## KI-Client
 
 Eine asyncio-Schleife mit drei Aufgaben: Die WebSocket-Aufgabe hält das neueste Paket.
-Die schnelle (20×/s) schätzt die Fahrtrichtung, fährt die gewählte Taktik und hält außerhalb
-des Kampfs oder ohne frisches Paket (1 s) an. Die langsame schickt etwa alle `turn_s` Bild
-und Lage an das Modell und führt die Werkzeugaufrufe aus; Ulti und Sprüche gehen als Aktionen
-an den Server, der sie nach denselben Regeln prüft wie bei Menschen.
+Die schnelle (20×/s) schätzt die Fahrtrichtung, setzt die Startlogik (Gegner bewegt sich oder
+10-s-Wartezeit) um und schickt die daraus gewählten Fahrbefehle an den Controller. Die langsame
+schickt etwa alle `turn_s` Bild und Lage an das Modell und führt die Werkzeugaufrufe aus; Ulti
+und Sprüche gehen als Aktionen an den Server, der sie nach denselben Regeln prüft wie bei
+Menschen.

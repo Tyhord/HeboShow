@@ -29,10 +29,9 @@ Ein eigener PC lässt den KI-Pilot seinen Roboter fahren. Er öffnet kein Fenste
    * `stage` → Bühne.
    * `mod` oder `moderator` → Moderation mit Passwort.
    * Jeder andere Name → Spieler.
-4. Danach fragt der KI-Client nur noch nach dem Startmodus und dem Roboter. Es gibt kein Copilot-/OpenAI-Setup mehr im normalen Betrieb.
-   * `manuell`: Externe WASD-Tasten oder eine Handsteuerung bleiben aktiv.
-   * `auto`: Der Plan-B-Pilot fährt sofort selbst.
-   * `Roboter`: Auswahl aus den per Bluetooth gefundenen `hebobot…`-Geräten oder Probelauf ohne Roboter.
+4. Danach fragt der KI-Client nur noch nach Startmodus und Controller-Endpunkt (`IP:Port`). Es gibt kein Copilot-/OpenAI-Setup mehr im normalen Betrieb.
+   * `manuell`: Der externe `HeboController/controller/load.py` fährt per lokaler WASD-Tastatur.
+   * `auto`: Der Plan-B-Pilot schickt WASD/Stop als UDP-Befehle an den Controller.
 5. Danach meldet er sich als Spieler an und schreibt Verbindungen, Taktikwechsel, Sprüche und Kommentare der KI in die Konsole. `Strg+C` hält den Roboter an und gibt den Platz frei.
 6. Reißt die Verbindung zum Server ab, hält der Roboter nach spätestens 1 s an; der Client verbindet sich von selbst neu. Wird die KI von der Moderation entfernt, beendet er sich.
 
@@ -42,17 +41,19 @@ Die KI läuft in der Konsole und kann während des Betriebs per Tastatur umgesch
 
 | Taste | Wirkung |
 | --- | --- |
-| `p` | Umschalten zwischen `manual` und `auto` |
-| `m` | Manuell aktivieren |
-| `a` | Automatik aktivieren |
-| `r` | Automatik erneut aktivieren / Resume |
-| `Space` | Sofort stoppen / Pause |
-| `w` | Vorwärts (nur im manuellen Modus) |
-| `a` | Links (nur im manuellen Modus) |
-| `s` | Rückwärts (nur im manuellen Modus) |
-| `d` | Rechts (nur im manuellen Modus) |
+| `p` | Umschalten zwischen `manual` und `auto`; beim Wechsel schickt der KI-Client einmal `stop` |
 
-Die Reihenfolge ist immer genau eine aktive Steuerquelle: entweder `manual` oder `auto`. Das verhindert widersprüchliche Eingaben bei gleichzeitigem Tastatur- und KI-Fahren.
+WASD für den Roboter kommen nie aus `pilot.py` direkt von der lokalen Tastatur: im Modus `manual` steuert nur
+`load.py`, im Modus `auto` nur der KI-Client per UDP.
+
+Die Reihenfolge ist immer genau eine aktive Steuerquelle: entweder `manual` oder `auto`. Das verhindert widersprüchliche Eingaben bei gleichzeitigem Tastatur- und KI-Fahren. `stop` beendet die aktuelle Dauerfahrt; danach fährt der Roboter erst wieder, wenn aus der aktiven Quelle ein neuer WASD-Befehl kommt.
+
+### Auto-Startverhalten
+
+* **Kein zweiter Roboter sichtbar:** Der KI-Client patrouilliert zufällig in der erlaubten Fläche und meidet Rand und Hindernisse.
+* **Zweiter Roboter sichtbar:** Der KI-Client wartet auf dessen Bewegung, höchstens 10 s.
+* **Nach 10 s ohne gegnerische Bewegung:** Die KI startet ebenfalls, vermeidet aber Angriffe, bis der Gegner erkennbar fährt.
+* **Sobald der Gegner fährt:** Die KI wechselt von Patrouille in Angriffstaktik.
 
 ### Beispiel-Start
 

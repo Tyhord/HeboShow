@@ -167,10 +167,24 @@ Jedes hat `id` (fortlaufend pro Kampf) und `type`. Die Bühne spielt jedes nur e
 | `ulti` | `player` (getroffen), `amount`, `pos` |
 | `ko` | `players` (auf 0), `winner` (id oder `null`) |
 
-## Roboter per Bluetooth (KI-Client)
+## Lokale Fahrbefehle KI-Client → HeboController (UDP)
 
-Nur der KI-Client, nicht der Server. Er verbindet sich per Bluetooth LE mit dem gewählten
-Gerät (Name beginnt mit `hebobot`) und schreibt ein Zeichen in die Characteristic
+Nur lokal auf dem Steuer-PC, nicht über den Server. Der KI-Client schickt JSON-Pakete per UDP
+an `load.py` (Standard `127.0.0.1:18899`):
+
+| `type` | Felder | Wirkung |
+| --- | --- | --- |
+| `mode` | `{"mode": "manual" \\| "auto"}` | Quelle umschalten; der Controller setzt dabei seine aktuelle Taste auf Stopp |
+| `drive` | `{"key": "w" \\| "a" \\| "s" \\| "d"}` | Fahrbefehl setzen (nur wirksam in `auto`) |
+| `stop` | – | Aktuelle Dauerfahrt sofort stoppen; danach fährt der Roboter erst bei neuem `drive` |
+
+Zusätzliche Felder wie `seq`, `source` und `ts_ms` sind erlaubt und dienen nur der
+Nachvollziehbarkeit.
+
+## Roboter per Bluetooth (HeboController)
+
+`load.py` verbindet sich per Bluetooth LE mit dem gewählten Gerät (Name beginnt mit
+`hebobot`) und schreibt ein Zeichen in die Characteristic
 `19B10001-E8F2-537E-4F6C-D104768A1214`:
 
 | Zeichen | Wirkung |
@@ -181,8 +195,8 @@ Gerät (Name beginnt mit `hebobot`) und schreibt ein Zeichen in die Characterist
 | `d` | auf der Stelle rechts drehen |
 | Leerzeichen | Stopp |
 
-Die Firmware hält den letzten Befehl, bis ein neuer kommt; der KI-Client schickt deshalb nur
-Wechsel und am Ende immer einen Stopp.
+Die Firmware hält den letzten Befehl, bis ein neuer kommt; der Controller setzt daher nur
+bei Wechseln eine neue Taste.
 
 ## KI-Modell (KI-Client)
 

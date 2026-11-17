@@ -166,7 +166,7 @@ def find_server(cfg: dict, forced: str | None) -> tuple[str, str]:
 
 # ---------- Anmelden ----------
 
-def login(server: str, server_id: str, cfg: dict) -> dict:
+def login(server: str, server_id: str, cfg: dict, forced_controller: str | None = None) -> dict:
     tokens = cfg.setdefault("tokens", {}).setdefault(server_id, {})
     ai = None
     while True:
@@ -183,7 +183,7 @@ def login(server: str, server_id: str, cfg: dict) -> dict:
             import pilot
 
             try:
-                ai = ai or pilot.setup(cfg)
+                ai = ai or pilot.setup(cfg, forced_controller)
             except pilot.PilotError as exc:
                 print(exc)
                 continue
@@ -264,6 +264,7 @@ def run_ai(server: str, result: dict) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(prog="hebo-client")
     parser.add_argument("--server", help="Server-Adresse (IP oder IP:Port) statt automatischer Suche")
+    parser.add_argument("--controller", help="Controller-Adresse (IP oder IP:Port) für KI-Fahrbefehle")
     args = parser.parse_args()
 
     cfg = load_config()
@@ -273,7 +274,7 @@ def main() -> None:
     cfg["server_id"] = server_id
     save_config(cfg)
 
-    result = login(server, server_id, cfg)
+    result = login(server, server_id, cfg, args.controller)
     save_config(cfg)
     role = result["role"]
     if result.get("ai"):
