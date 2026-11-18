@@ -24,6 +24,17 @@ Veranstaltungsnetz oder den Server selbst abfragt, lehnt er Ziele im lokalen, pr
 Loopback-Netz ab, prüft jede Weiterleitung neu und verbindet zur bereits geprüften IP.
 Medien aus dem eigenen Netz kommen über „Datei“ oder direkt in den Ordner `memes/`.
 
+**„Standard“ ist zugleich „Ohne Kategorie“ und steht unten.**
+Eine zweite Sammelkategorie hätte zwei Orte für dasselbe geschaffen. Eigene Kategorien sind
+das, was man sucht, deshalb oben; „Standard“ nimmt neue Dateien und die Kacheln gelöschter
+Kategorien auf und bleibt als Rest immer unten. Gespeichert wird sie nicht, die
+Dateiablage blieb dafür unverändert.
+
+**Ansicht der Moderation je Gerät in `client.json`.**
+Eingeklappte Einstellungen und Raster/Liste sind eine Frage des Bildschirms, nicht des
+Spiels, und gehören nicht auf den Server. Der Browser-Speicher von pywebview überlebt keinen
+Neustart (privater Modus, wechselnder Port), deshalb speichert der lokale Seitenserver sie.
+
 **Laser-Ulti lädt durch Schaden und ist ausweichbar.**
 Die Ulti lädt nur über erlittenen Schaden, damit sie als Comeback-Mittel wirkt und nicht
 gleich zu Beginn verpufft. Die Ziellinie steht 1,2 s vorher fest, damit ein Treffer
@@ -35,6 +46,9 @@ Moderation für beide und jeder angemeldete Spieler für seinen eigenen Roboter.
 sonst blockiert die Bühne Memes mit Ton, bis jemand hineinklickt. Ist
 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` schon gesetzt, gilt der vorhandene Wert. Jedes
 Bühnenfenster spielt den Ton, auch das der Moderation und der Spieler.
+Zusätzlich sind mit `--disable-direct-composition-video-overlays` die Hardware-Video-Overlays
+aus: Manche Grafiktreiber frieren beim Abspielen der Memes sonst den Mauszeiger ein oder
+blenden ihn aus, obwohl Klicks weiter ankommen. Videos kosten dadurch etwas mehr GPU.
 
 **Green-Screen-Memes werden vorab freigestellt, nicht live.**
 `hebocon.memes` rechnet das Grün einmalig heraus und speichert WebM (VP9) mit echtem

@@ -37,12 +37,12 @@ KI-Client (GitHub Copilot oder OpenAI) auf seinem eigenen PC:
 
 | Datei | Aufgabe |
 | --- | --- |
-| `client.py` | Server suchen oder IP abfragen, `name:` und Passwort abfragen, anmelden, Seiten lokal ausliefern, pywebview-Fenster öffnen, Verbindung überwachen; bei `KI`/`AI` stattdessen `pilot.py` starten |
+| `client.py` | Server suchen oder IP abfragen, `name:` und Passwort abfragen, anmelden, Seiten lokal ausliefern (dazu `/prefs` für die Ansicht der Moderation), pywebview-Fenster öffnen, Verbindung überwachen; bei `KI`/`AI` stattdessen `pilot.py` starten |
 | `pilot.py` | KI-Client: Zugang (Copilot oder OpenAI-Schlüssel) und Modellwahl, Bluetooth zum Roboter, WebSocket mit Bild, Lagebild und Bild ans Modell, Werkzeuge, Taktik-Regler, Status an den Server |
 | `web/common.js` | Serveradresse und Token aus der URL, `api()`, `connect()`, Zeichnen |
 | `web/stage.html` | Bühne; beim Spieler zusätzlich eigener Ulti-Knopf und Wenig-HP-Vignette |
 | `web/operator.html` | Bedienung |
-| `client.json` | Letzter Server, Tokens je Server und Rolle, Vorgaben des KI-Clients |
+| `client.json` | Letzter Server, Tokens je Server und Rolle, Vorgaben des KI-Clients, Ansicht der Moderation |
 
 ## Threads Server
 

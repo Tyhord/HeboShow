@@ -83,8 +83,9 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
     für Schrumpfen).
   * Schalter „Lebensleisten & Timer in der Kampfansicht“: blendet Lebensleisten,
     Kampfzeit und Statuszeilen in der Kampfansicht aus, etwa für Ansagen.
-* **Memes & Sounds**: „⤒ Upload“ und ⏹ Medien stoppen, darunter „＋ Kategorie“ und die
-  Kategorien mit ihren Kacheln.
+* **Memes & Sounds**: „⤒ Upload“, ⏹ Medien stoppen und rechts der Ansichtsschalter
+  ▦ Raster / ☰ Liste, darunter die eigenen Kategorien, „＋ Kategorie“ und ganz unten
+  „Standard“, jeweils mit ihren Kacheln.
 * ⚔ öffnet ein kleines Fenster mit je einem Steckbrief pro Roboter (blau Roboter 1, rot
   Roboter 2): Bild (am besten PNG mit transparentem Hintergrund; ✕ entfernt es), Name, Team,
   Gewicht, Höhe und optional ein Slogan. Gewicht und Höhe sind freier Text („850 g“).
@@ -105,11 +106,13 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
   Kachel mit dem Dateinamen ohne Endung; „✎“ benennt sie um (Enter oder Klick daneben
   übernimmt, Esc verwirft), „🗑“ löscht sie nach Rückfrage samt Datei. Neue Kacheln stehen
   vorne in „Standard“.
-* **Kategorien**: „Standard“ gibt es immer; sie lässt sich weder umbenennen noch löschen
-  oder verschieben. „＋ Kategorie“ legt eine neue an (Name eingeben, Enter). Eigene
-  Kategorien lassen sich umbenennen (✎), mit ▲/▼ verschieben und löschen (🗑, nach
-  Rückfrage); ihre Kacheln wandern dann ans Ende von „Standard“, Dateien bleiben erhalten.
-  Namen sind eindeutig (Groß-/Kleinschreibung egal).
+* **Kategorien**: „Standard“ gibt es immer; sie sammelt alles, was keiner eigenen Kategorie
+  gehört, steht immer als letzte und lässt sich weder umbenennen noch löschen oder
+  verschieben. „＋ Kategorie“ steht direkt über „Standard“ und legt dort eine neue an (Name
+  eingeben, Enter). Eigene Kategorien lassen sich umbenennen (✎), am Griff ⠿ an jede Stelle
+  über „Standard“ ziehen (eine Linie zeigt die Stelle; mit Fokus auf dem Griff gehen auch
+  ↑/↓) und löschen (🗑, nach Rückfrage); ihre Kacheln wandern dann ans Ende von „Standard“,
+  Dateien bleiben erhalten. Namen sind eindeutig (Groß-/Kleinschreibung egal).
 * **Ziehen und Ablegen**: Kacheln lassen sich innerhalb einer Kategorie und in andere
   Kategorien ziehen; eine Linie zeigt, wo sie landen, die Zielkategorie leuchtet. Ziehen
   spielt nichts ab. Kategorien, Zuordnung und Reihenfolge speichert der Server; sie gelten
@@ -123,8 +126,11 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
     startet es von vorn an einer neuen Stelle. Läuft ein Medium zu Ende, gilt es ebenfalls
     als gestoppt. Laufende Kacheln sind grün umrandet („⏹ Läuft – Klick stoppt“). Mehrere
     Medien laufen gleichzeitig; „⏹ Medien stoppen“ beendet alle.
-  * Die Kacheln stehen gleich groß in 3 Spalten, wenn das Board breit genug ist (Bedienung
-    im Vollbild), sonst in 2 Spalten (etwa halber Bildschirm).
+  * Im Raster stehen die Kacheln gleich groß in so vielen Spalten, wie die Breite hergibt:
+    etwa 2 bei halbem Bildschirm, 3 im Vollbild, deutlich mehr bei eingeklappten
+    Einstellungen. Die Liste zeigt eine Zeile pro Kachel mit Name, Abspielstatus, ✎ und 🗑;
+    Klicken, Ziehen und Ablegen funktionieren dort genauso. Der Wechsel ändert weder
+    Kategorien noch Reihenfolge noch laufende Medien.
   Videos und Ton spielen im App-Fenster mit Ton, ohne dass jemand in die Bühne klickt.
   Fehlt Windows der Dateityp, gilt die Endung (z. B. mkv, mov, m4a); andere Formate und zu
   große Dateien (über 100 MB) meldet die Bedienung.
@@ -154,6 +160,10 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
   laufen bis zu ihrem Ende, auch über 30 s.
 
 **Rechts: Einstellungen** mit Reitern „📷 Kamera · 🔳 Spielfeld · 🤖 Roboter · ⚖ Balancing“.
+» in der Kopfzeile klappt die Einstellungen zu einer schmalen Leiste ein, das Soundboard
+bekommt die Breite; « oder ein Klick auf die Leiste klappt sie wieder aus. Eingeklappt
+erscheinen Meldungen kurz unten im Bild. Eingeklappt/ausgeklappt und Raster/Liste merkt sich
+der Client je Gerät in `client.json`.
 Der Reiter folgt dem Ablauf (keine Kamera → Kamera, Kalibrierung → Spielfeld, Registrierung
 → Roboter, sonst Kamera mit dem Technik-Status). Ein Klick zeigt einen anderen Reiter, bis der Ablauf
 weiterspringt. Über den Reitern stehen:

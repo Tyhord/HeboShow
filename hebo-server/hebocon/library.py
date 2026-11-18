@@ -130,7 +130,8 @@ class MemeLibrary:
         if isinstance(data, list):
             data = {"categories": [], "entries": data}
         self.categories: list[dict] = [c for c in data.get("categories", []) if c.get("id") != STANDARD]
-        self.categories.insert(0, {"id": STANDARD, "name": "Standard"})
+        # „Standard“ sammelt alles ohne eigene Kategorie und steht deshalb immer unten; gespeichert nie.
+        self.categories.append({"id": STANDARD, "name": "Standard"})
         self.entries: list[dict] = data.get("entries", [])
         ids = {c["id"] for c in self.categories}
         for entry in self.entries:
@@ -319,7 +320,7 @@ class MemeLibrary:
             if any(c["name"].lower() == name.lower() for c in self.categories):
                 raise MediaError(f"Kategorie „{name}“ gibt es schon.")
             category = {"id": uuid.uuid4().hex[:8], "name": name}
-            self.categories.append(category)
+            self.categories.insert(len(self.categories) - 1, category)
             self._save()
         self.on_change(None)
         return category
@@ -346,8 +347,7 @@ class MemeLibrary:
         with self.lock:
             category = self._custom(cid)
             self.categories.remove(category)
-            # „Standard“ bleibt immer oben, eigene Kategorien sortieren sich dahinter.
-            self.categories.insert(min(max(index, 0), len(self.categories) - 1) + 1, category)
+            self.categories.insert(min(max(index, 0), len(self.categories) - 1), category)
             self._save()
         self.on_change(None)
 
@@ -460,6 +460,6 @@ class MemeLibrary:
 
     def _save(self) -> None:
         tmp = self.index_file.with_suffix(".tmp")
-        data = {"categories": self.categories[1:], "entries": self.entries}
+        data = {"categories": self.categories[:-1], "entries": self.entries}
         tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
         tmp.replace(self.index_file)

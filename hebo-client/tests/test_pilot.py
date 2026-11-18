@@ -265,10 +265,12 @@ def test_openai_rejects_bad_key(monkeypatch):
         pilot._openai_models("sk-falsch")
 
 
-def test_openai_key_reaches_session_without_github(monkeypatch):
+@pytest.mark.parametrize(("model", "effort", "wire"), [("gpt-4.1-mini", None, None),
+                                                      ("gpt-5.6-sol", "low", "responses")])
+def test_openai_key_reaches_session_without_github(monkeypatch, model, effort, wire):
     fake = FakeClient(script=[("set_tactic", {"tactic": "push_out", "side": "left"})])
     p, _posts = make_pilot(fake, monkeypatch)
-    p.cfg = Setup("gpt-4.1-mini", "gpt-4.1-mini", None, "taktik", "", "", turn_s=0.05, api_key="sk-test")
+    p.cfg = Setup(model, model, effort, "taktik", "", "", turn_s=0.05, api_key="sk-test")
 
     async def scenario():
         task = asyncio.create_task(p.main())
@@ -281,4 +283,5 @@ def test_openai_key_reaches_session_without_github(monkeypatch):
     assert fake.token is None
     provider = fake.sessions[0]["provider"]
     assert provider["type"] == "openai" and provider["api_key"] == "sk-test"
-    assert "reasoning_effort" not in fake.sessions[0]
+    assert provider.get("wire_api") == wire
+    assert fake.sessions[0].get("reasoning_effort") == effort

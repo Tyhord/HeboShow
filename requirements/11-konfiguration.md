@@ -94,6 +94,7 @@ vor `.env` und Standard. „↺ Standardwerte“ löscht die Datei, danach gilt 
 | `client.json` → `server` | Zuletzt erfolgreich benutzter Server, wird automatisch gepflegt |
 | `client.json` → `tokens` | Anmeldung je Server und Rolle, damit ein Spieler seinen Platz zurückbekommt |
 | `client.json` → `stage_fullscreen` | `true` öffnet die Bühne im Vollbild (Standard `false`) |
+| `client.json` → `view` | Ansicht der Moderation auf diesem Gerät: `settings_collapsed` (Einstellungen eingeklappt) und `board_view` (`grid`/`list`); pflegt die Seite selbst über `/prefs` des lokalen Seitenservers |
 | `client.json` → `ai` | Vorgaben des KI-Clients: `access` (`copilot`/`openai`), `model`, `steering` (`taktik`/`direkt`), `robot` (Bluetooth-Name, leer = Probelauf) werden bei jeder Anmeldung abgefragt und gemerkt. Nur hier einstellbar: `turn_s` (`1.5`, Mindestabstand zwischen zwei Bildern ans Modell in Sekunden), `max_calls` (`200`, Modellanfragen je Kampf, danach bleibt der Roboter stehen), `image_px` (`512`, Kantenlänge des Bildes ans Modell) |
 | `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN` | Copilot-Token für den KI-Client, in dieser Reihenfolge; fein granular (`github_pat_…`) oder OAuth (`gho_…`, `ghu_…`), klassische `ghp_…` gehen nicht. Ohne Variable gilt die Anmeldung der Copilot-CLI auf dem KI-PC, sonst fragt der Client |
 | `OPENAI_API_KEY` | OpenAI-Schlüssel für den KI-Client mit Zugang „OpenAI“; ohne Variable fragt der Client. Wird nie in `client.json` gespeichert |

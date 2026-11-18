@@ -781,6 +781,10 @@ class Pilot:
         extra = {"reasoning_effort": self.cfg.effort} if self.cfg.effort else {}
         if self.cfg.api_key:
             extra["provider"] = {"type": "openai", "base_url": OPENAI_URL, "api_key": self.cfg.api_key}
+            # Denkende Modelle lehnen Werkzeuge über Chat Completions ab; ältere kennen die Responses-API-
+            # Felder fürs Denken nicht, darum nur für diese umschalten.
+            if OPENAI_REASONING.match(self.cfg.model):
+                extra["provider"]["wire_api"] = "responses"
         return await client.create_session(
             on_permission_request=PermissionHandler.approve_all, model=self.cfg.model, tools=self.tools(),
             system_message={"mode": "replace", "content": prompt(self.slot, self.cfg.steering)},

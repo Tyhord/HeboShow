@@ -215,11 +215,46 @@ def login(server: str, server_id: str, cfg: dict) -> dict:
 
 class Handler(SimpleHTTPRequestHandler):
     extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".js": "text/javascript"}
+    prefs_lock = threading.Lock()
 
     def end_headers(self):
         # Nach einem Update sollen alle Geräte sofort die neuen Seiten laden, nicht einen alten Stand.
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
+
+    def send_json(self, data: dict) -> None:
+        body = json.dumps(data).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    # Ansichtswünsche gehören zum Gerät, nicht zum Spiel; WebView2 vergisst seinen Speicher (privater
+    # Modus, wechselnder Port), deshalb landen sie in client.json.
+    def do_GET(self):
+        if self.path == "/prefs":
+            self.send_json(load_config().get("view", {}))
+        else:
+            super().do_GET()
+
+    def do_POST(self):
+        if self.path != "/prefs":
+            self.send_error(404)
+            return
+        try:
+            data = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+        except ValueError:
+            self.send_error(400)
+            return
+        if not isinstance(data, dict):
+            self.send_error(400)
+            return
+        with self.prefs_lock:
+            cfg = load_config()
+            cfg["view"] = {**cfg.get("view", {}), **data}
+            save_config(cfg)
+        self.send_json({"ok": True})
 
     def log_message(self, format, *args):
         pass
@@ -290,9 +325,11 @@ def main() -> None:
     base = f"http://127.0.0.1:{port}"
 
     # Ohne Klick ins Bühnenfenster blockiert WebView2 sonst Memes mit Ton; die Overscroll-Option
-    # setzt pywebview selbst und ginge durch die Variable verloren.
+    # setzt pywebview selbst und ginge durch die Variable verloren. Hardware-Video-Overlays sind aus,
+    # weil manche Grafiktreiber beim Abspielen der Memes sonst den Mauszeiger einfrieren oder verstecken.
     os.environ.setdefault("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-                          "--disable-features=ElasticOverscroll --autoplay-policy=no-user-gesture-required")
+                          "--disable-features=ElasticOverscroll --autoplay-policy=no-user-gesture-required"
+                          " --disable-direct-composition-video-overlays")
     import webview
 
     webview.create_window(f"Hebocon Spieler – {result['name']}" if role == "player" else "Hebocon Bühne",

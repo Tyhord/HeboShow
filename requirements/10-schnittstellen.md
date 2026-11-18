@@ -54,13 +54,13 @@ fehlendem Recht 403 und `{"ok": false, "message"}`.
 | --- | --- |
 | `POST /media` | Datei hochladen: roher Körper, `Content-Type` der Datei, Kopf `X-Name` (URL-kodiert). Ohne `X-Board: 1` ein Steckbriefbild (`/media/<key>`, bis zum Neustart). Mit `X-Board: 1` eine Soundboard-Kachel in `memes/`; `X-Key: 1` stellt ein Video zusätzlich frei. Der Typ wird am Inhalt geprüft. Antwort `{"ok", "url", "file", "name", "mime", "category", "cutout", "processing"}`, höchstens 100 MB |
 | `POST /media/url` | Kachel von einer Adresse holen, Körper `{"url", "key"?}`. Nur http/https ohne Zugangsdaten; Ziele im lokalen oder privaten Netz (auch nach DNS-Auflösung und Weiterleitungen) lehnt der Server ab. Antwort wie `POST /media` |
-| `GET /media` | Soundboard: `{"categories": [{"id", "name"}], "memes": [{"url", "file", "name", "mime", "category", "cutout", "processing"}]}`, beides in Board-Reihenfolge; `categories[0]` ist immer `standard`; `cutout: true` heißt freigestelltes Video mit Alphakanal, die Bühne zeigt es ohne Rahmen; `processing: true` heißt, das Grün wird gerade entfernt |
+| `GET /media` | Soundboard: `{"categories": [{"id", "name"}], "memes": [{"url", "file", "name", "mime", "category", "cutout", "processing"}]}`, beides in Board-Reihenfolge; `categories[-1]` ist immer `standard` (alles ohne eigene Kategorie, steht immer unten); `cutout: true` heißt freigestelltes Video mit Alphakanal, die Bühne zeigt es ohne Rahmen; `processing: true` heißt, das Grün wird gerade entfernt |
 | `GET /media/<key>` | Steckbriefbild abrufen |
 | `GET /memes/<datei>` | Meme-Datei abrufen (nur Dateien, die im Soundboard stehen) |
 | `PATCH /memes/<datei>` | Kachel umbenennen, Körper `{"name"}`, oder verschieben, Körper `{"category", "index"}` (`index` zählt nur die Kacheln der Zielkategorie ohne die verschobene) |
 | `DELETE /memes/<datei>` | Kachel und Datei löschen; während des Freistellens nicht möglich |
 | `POST /categories` | Kategorie anlegen, Körper `{"name"}`; Antwort `{"ok", "id", "name"}`. Namen sind ohne Groß-/Kleinschreibung eindeutig |
-| `PATCH /categories/<id>` | umbenennen `{"name"}` oder verschieben `{"index"}` (0 = direkt nach `standard`) |
+| `PATCH /categories/<id>` | umbenennen `{"name"}` oder verschieben `{"index"}` (zählt nur eigene Kategorien ohne die verschobene, 0 = ganz oben; `standard` bleibt immer dahinter) |
 | `DELETE /categories/<id>` | Kategorie löschen; ihre Kacheln wandern ans Ende von `standard`. `standard` selbst ist gesperrt |
 
 `url` ist relativ zum Server (`/memes/<datei>` URL-kodiert); die Seiten setzen die Serveradresse davor.
@@ -187,9 +187,10 @@ Wechsel und am Ende immer einen Stopp.
 ## KI-Modell (KI-Client)
 
 Der KI-Client spricht über das Paket `github-copilot-sdk` mit GitHub Copilot oder, mit eigenem
-Schlüssel, über dessen Provider-Anbindung direkt mit OpenAI (`https://api.openai.com/v1`,
-Chat Completions; GitHub-Anmeldung dabei aus). Denkende Modelle (GPT-5 und neuer, o-Reihe)
-bekommen den Denkaufwand „low“. Den Schlüssel prüft er vorab mit `GET /v1/models`. Er liest
+Schlüssel, über dessen Provider-Anbindung direkt mit OpenAI (`https://api.openai.com/v1`;
+GitHub-Anmeldung dabei aus). GPT-4o und GPT-4.1 laufen über Chat Completions; denkende Modelle
+(GPT-5 und neuer, o-Reihe) über die Responses-API mit Denkaufwand „low“, weil OpenAI dort sonst
+keine Werkzeuge erlaubt. Den Schlüssel prüft er vorab mit `GET /v1/models`. Er liest
 `/ws?token=…&frames=1`, braucht also das entzerrte Arenabild. Je Runde geht ein JPEG der
 Arena (eigener Roboter grün „DU“ mit Pfeil für die Fahrtrichtung, Gegner rot „GEGNER“,
 Rand weiß, Zone orange, Objekte als Kreise) und ein kurzer Lagetext an das Modell. Das Modell antwortet
