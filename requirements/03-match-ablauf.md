@@ -67,6 +67,10 @@ Im Normalfall also: N, Name, Enter, Name, Enter, S.
   `HEBOCON_INTRO_S`). Danach bleibt der VS-Bildschirm stehen (Phase `ready`), bis die
   Moderation noch einmal „Start“ drückt. Dann zählt die Bühne 3, 2, 1 herunter (Phase
   `countdown`, 3 s), zeigt „FIGHT!“, setzt beide auf 100 HP und startet die Kampfzeit.
+  Ist in der Bedienung „Play intro animation before match“ aus, entfällt nur das
+  Intro-Video: „Start“ zeigt sofort den VS-Bildschirm (Phase `ready`), der ebenfalls bis zum
+  nächsten „Start“ stehen bleibt. Die Wahl speichert der Server in `data/match.json`; sie gilt
+  ab dem nächsten „Start“ und nach Neustart.
   Mit `HEBOCON_INTRO_S=0` entfallen Intro, VS-Bildschirm und Countdown; der Kampf
   beginnt sofort.
   Das Tracking läuft dabei einfach weiter. Schaden, Spawnen und Schrumpfen gibt es erst

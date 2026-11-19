@@ -50,7 +50,8 @@ def _points(pts: np.ndarray | None) -> list[list[float]]:
 
 
 class App:
-    def __init__(self, cfg: Settings, balancing_file: Path | None = None, lobby: Lobby | None = None):
+    def __init__(self, cfg: Settings, balancing_file: Path | None = None, lobby: Lobby | None = None,
+                 match_file: Path | None = None):
         self.cfg = cfg
         self.lobby = lobby
         self._message = ""
@@ -86,6 +87,9 @@ class App:
         self.contact = False
         self.battle = 0
         self.hud = True
+        # Eigene Datei statt balancing.json, damit „Standardwerte“ diese Wahl nicht mit zurücksetzt.
+        self.match_file = match_file
+        self.play_intro = self._load_play_intro()
         # Steckbriefe für den VS-Bildschirm; überdauern Kämpfe, bis die Moderation sie ändert.
         self.profiles = [dict(PROFILE_EMPTY), dict(PROFILE_EMPTY)]
         # Laufende und pausierte Medien; der Server führt sie, damit alle Bühnen dasselbe zeigen.
@@ -156,9 +160,9 @@ class App:
         handler = getattr(self, f"do_{action}", None)
         if handler is None:
             raise UserError(f"Unbekannte Aktion '{action}'.")
-        if self.busy and action not in ("camera", "abort", "spawn", "shrink", "hud", "profile", "cue", "ko",
-                                        "ulti", "balancing", "balancing_reset", "name", "kick", "say",
-                                        "ai_status"):
+        if self.busy and action not in ("camera", "abort", "spawn", "shrink", "hud", "intro", "profile",
+                                        "cue", "ko", "ulti", "balancing", "balancing_reset", "name", "kick",
+                                        "say", "ai_status"):
             raise UserError(f"Bitte warten: {self.busy}")
         with self._lock:
             handler(**data)
@@ -234,9 +238,13 @@ class App:
                     return
                 self.battle += 1
                 self.phase_until = time.monotonic() + self.cfg.intro_s
-                if self.cfg.intro_s > 0:
+                if self.cfg.intro_s > 0 and self.play_intro:
                     self.phase = "intro"
                     self.message = "Intro läuft."
+                elif self.cfg.intro_s > 0:
+                    # Ohne Intro direkt zum VS-Bildschirm; der wartet wie sonst auf 'Start'.
+                    self.phase = "ready"
+                    self.message = "VS-Bildschirm läuft. Start drückt den Countdown."
                 else:
                     # Ohne Intro auch kein VS und kein Countdown: sofort kämpfen, etwa zum Testen.
                     self._begin_fight(time.monotonic())
@@ -271,6 +279,26 @@ class App:
 
     def do_hud(self, on: bool) -> None:
         self.hud = bool(on)
+
+    def do_intro(self, on: bool) -> None:
+        self.play_intro = bool(on)
+        if self.match_file is not None:
+            self.match_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.match_file.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"intro": self.play_intro}), "utf-8")
+            tmp.replace(self.match_file)
+        self.message = ("Intro läuft vor dem nächsten Kampf." if self.play_intro
+                        else "Nächster Kampf beginnt ohne Intro direkt mit dem VS-Bildschirm.")
+
+    def _load_play_intro(self) -> bool:
+        path = self.match_file
+        if path is None or not path.is_file():
+            return True
+        try:
+            return bool(json.loads(path.read_text("utf-8")).get("intro", True))
+        except (OSError, ValueError, AttributeError):
+            log.warning("%s ist unlesbar, das Intro bleibt an.", path)
+            return True
 
     def do_profile(self, player: int, name: str = "", **fields: str) -> None:
         if player not in (1, 2):
@@ -642,6 +670,7 @@ class App:
             "intro": left if self.phase == "intro" else None,
             "countdown": left if self.phase == "countdown" else None,
             "memes": self._meme_state(t), "elapsed": elapsed, "hud": self.hud, "vs": vs, "names": self.names,
+            "play_intro": self.play_intro,
             "profiles": self.profiles, "shot": shot,
             "balancing": {k: getattr(self.cfg, k) for k in BALANCING},
             "lobby": lobby,

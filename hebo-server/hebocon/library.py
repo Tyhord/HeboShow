@@ -2,7 +2,8 @@
 """Soundboard-Bibliothek: Der Ordner ``memes/`` ist die Quelle, ein Index merkt sich Namen, Kategorie und
 Reihenfolge.
 
-Dateien, die jemand in den Ordner legt, erscheinen von selbst in „Standard“; hochgeladene landen dort auch.
+Dateien, die jemand in den Ordner legt, erscheinen von selbst in „Uncategorized“; hochgeladene
+landen dort auch.
 Videos mit Haken „Green Screen entfernen“ stellt ein eigener Prozess frei (``memes.process_file``).
 """
 
@@ -41,6 +42,8 @@ CARRY_S = 120.0
 # Taucht eine Datei auf, deren Name schon im Soundboard steht, erst kurz warten: meist wird gerade ersetzt.
 SAME_STEM_POLLS = 5
 STANDARD = "standard"
+# Sammelt alles ohne Kategorie; steht immer ganz unten und wird nie gespeichert.
+UNSORTED = "uncategorized"
 MAX_LABEL = 40
 
 
@@ -126,16 +129,19 @@ class MemeLibrary:
         index.parent.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
         data = json.loads(index.read_text("utf-8")) if index.exists() else []
-        # Alter Index war eine flache Liste; alles darin gehört dann zu „Standard“.
+        # Alter Index war eine flache Liste; alles darin gehörte zu „Standard“ und bleibt dort.
         if isinstance(data, list):
-            data = {"categories": [], "entries": data}
-        self.categories: list[dict] = [c for c in data.get("categories", []) if c.get("id") != STANDARD]
-        self.categories.insert(0, {"id": STANDARD, "name": "Standard"})
+            data = {"categories": [], "entries": [{"category": STANDARD, **e} for e in data]}
+        self.categories: list[dict] = [c for c in data.get("categories", []) if c.get("id") != UNSORTED]
+        # Ältere Indexe speichern „Standard“ nicht mit; dann steht sie wie bisher oben.
+        if not any(c.get("id") == STANDARD for c in self.categories):
+            self.categories.insert(0, {"id": STANDARD, "name": "Standard"})
+        self.categories.append({"id": UNSORTED, "name": "Uncategorized"})
         self.entries: list[dict] = data.get("entries", [])
         ids = {c["id"] for c in self.categories}
         for entry in self.entries:
             if entry.get("category") not in ids:
-                entry["category"] = STANDARD
+                entry["category"] = UNSORTED
         self.keying: dict[str, float] = {}
         self._pending: dict[str, tuple[tuple[int, int], int]] = {}
         self._gone: dict[str, tuple[dict, int, float]] = {}
@@ -155,7 +161,7 @@ class MemeLibrary:
 
     def public(self, entry: dict) -> dict:
         return {"url": self.url(entry["file"]), "file": entry["file"], "name": entry["name"],
-                "mime": entry["mime"], "category": entry.get("category", STANDARD),
+                "mime": entry["mime"], "category": entry.get("category", UNSORTED),
                 "cutout": entry.get("cutout", False), "processing": entry.get("processing", False)}
 
     @staticmethod
@@ -179,7 +185,7 @@ class MemeLibrary:
 
     def _entry(self, file: str) -> dict:
         mime = MIME.get(Path(file).suffix.lower(), "application/octet-stream")
-        entry = {"file": file, "name": display_name(file), "mime": mime, "category": STANDARD}
+        entry = {"file": file, "name": display_name(file), "mime": mime, "category": UNSORTED}
         if has_alpha(self.folder / file):
             entry["cutout"] = True
         return entry
@@ -240,7 +246,7 @@ class MemeLibrary:
                 old = self._gone.pop(Path(name).stem.lower(), None)
                 if old:
                     entry["name"] = old[0]["name"]
-                    entry["category"] = old[0].get("category", STANDARD)
+                    entry["category"] = old[0].get("category", UNSORTED)
                     self.entries.insert(min(old[1], len(self.entries)), entry)
                     log.info("Meme „%s“ ersetzt durch %s.", old[0]["file"], name)
                 else:
@@ -319,14 +325,14 @@ class MemeLibrary:
             if any(c["name"].lower() == name.lower() for c in self.categories):
                 raise MediaError(f"Kategorie „{name}“ gibt es schon.")
             category = {"id": uuid.uuid4().hex[:8], "name": name}
-            self.categories.append(category)
+            self.categories.insert(len(self.categories) - 1, category)
             self._save()
         self.on_change(None)
         return category
 
     def _custom(self, cid: str) -> dict:
-        if cid == STANDARD:
-            raise MediaError("„Standard“ lässt sich nicht ändern oder löschen.")
+        if cid in (STANDARD, UNSORTED):
+            raise MediaError("„Standard“ und „Uncategorized“ lassen sich nicht umbenennen oder löschen.")
         category = next((c for c in self.categories if c["id"] == cid), None)
         if category is None:
             raise MediaError("Kategorie nicht gefunden.")
@@ -343,11 +349,13 @@ class MemeLibrary:
         self.on_change(None)
 
     def move_category(self, cid: str, index: int) -> None:
+        """``index`` zählt ohne „Uncategorized“, die bleibt immer unten."""
         with self.lock:
-            category = self._custom(cid)
+            category = next((c for c in self.categories if c["id"] == cid and cid != UNSORTED), None)
+            if category is None:
+                raise MediaError("Kategorie nicht gefunden.")
             self.categories.remove(category)
-            # „Standard“ bleibt immer oben, eigene Kategorien sortieren sich dahinter.
-            self.categories.insert(min(max(index, 0), len(self.categories) - 1) + 1, category)
+            self.categories.insert(min(max(index, 0), len(self.categories) - 1), category)
             self._save()
         self.on_change(None)
 
@@ -460,6 +468,6 @@ class MemeLibrary:
 
     def _save(self) -> None:
         tmp = self.index_file.with_suffix(".tmp")
-        data = {"categories": self.categories[1:], "entries": self.entries}
+        data = {"categories": self.categories[:-1], "entries": self.entries}
         tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
         tmp.replace(self.index_file)

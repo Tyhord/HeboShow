@@ -14,6 +14,17 @@ Neustart, damit Memes nicht vor jeder Veranstaltung neu hochgeladen werden müss
 ist die Quelle: Wer Dateien hineinlegt, braucht keinen Upload. Steckbriefe
 sind nicht dauerhaft; ihre Bilder löscht die App deshalb beim nächsten Start.
 
+**„Uncategorized“ nur angezeigt, nicht gespeichert.**
+Kacheln ohne Kategorie sammeln sich in einer festen Rubrik ganz unten. Sie steht nie in
+`data/soundboard.json`, damit bestehende Zuordnungen und Namen beim Umstieg unverändert
+bleiben und keine Migration nötig ist. „Standard“ bleibt eine echte Kategorie, ihre Position
+wird gespeichert.
+
+**Ansicht der Bedienung je Gerät im Client.**
+Eingeklappte Einstellungen und Grid/Liste sind Geschmack des jeweiligen Bildschirms, nicht
+des Spiels. pywebview läuft privat und vergisst `localStorage`; deshalb merkt der Client sie
+in `client.json`. Der Intro-Schalter gehört dagegen zum Ablauf und liegt auf dem Server.
+
 **Zweiter Klick auf ein Meme stoppt statt zu pausieren.**
 Ein pausiertes Meme blieb als Standbild auf der Bühne stehen und musste extra weggeklickt
 werden. Stoppen nimmt es sofort weg; wer es wieder will, startet es von vorn.

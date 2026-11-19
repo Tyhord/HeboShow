@@ -81,5 +81,6 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 BALANCING_FILE = DATA_DIR / "balancing.json"
 LOBBY_FILE = DATA_DIR / "lobby.json"
 NETWORK_FILE = DATA_DIR / "network.json"
+MATCH_FILE = DATA_DIR / "match.json"
 
 settings = Settings()

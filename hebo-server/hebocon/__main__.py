@@ -11,7 +11,7 @@ import uvicorn
 
 from . import discovery, network
 from .app import App
-from .config import BALANCING_FILE, LOBBY_FILE, NETWORK_FILE, settings
+from .config import BALANCING_FILE, LOBBY_FILE, MATCH_FILE, NETWORK_FILE, settings
 from .lobby import Lobby
 from .server import create_server
 
@@ -58,7 +58,7 @@ def main() -> None:
         host = adapter.ip if adapter else "127.0.0.1"
 
     lobby = Lobby(LOBBY_FILE, settings.mod_password)
-    app = App(settings, BALANCING_FILE, lobby)
+    app = App(settings, BALANCING_FILE, lobby, MATCH_FILE)
     app.start()
     stop = threading.Event()
     subnet = adapter.subnet if adapter else None

@@ -18,7 +18,7 @@ KI-Client (GitHub Copilot oder OpenAI) auf seinem eigenen PC:
 | `hebocon/__main__.py` | Start: Logging, Adapterwahl, Konsolen-Banner, Suche, uvicorn auf der gewählten IP |
 | `hebocon/network.py` | Netzwerkadapter auflisten, in der Konsole wählen, in `data/network.json` merken, überwachen |
 | `hebocon/config.py` | Alle Einstellungen (`HEBOCON_`), Grenzen der Balancing-Werte |
-| `hebocon/app.py` | Ablaufsteuerung, Phasen, Aktionen, Zustand; Balancing laden und in `data/balancing.json` speichern |
+| `hebocon/app.py` | Ablaufsteuerung, Phasen, Aktionen, Zustand; Balancing laden und in `data/balancing.json` speichern, Intro-Schalter in `data/match.json` |
 | `hebocon/lobby.py` | Rollen, Tokens, Moderationspasswort, Spielerplätze; gespeichert in `data/lobby.json` |
 | `hebocon/discovery.py` | Antwortet auf UDP-Suchanfragen der Clients |
 | `hebocon/camera.py` | Kamera-Thread, hält nur das neueste Bild |
@@ -28,7 +28,7 @@ KI-Client (GitHub Copilot oder OpenAI) auf seinem eigenen PC:
 | `hebocon/tracking.py` | Zwei Roboter-Plätze aus der Leerbild-Differenz, Aussehens-Abgleich, EdgeTAM-Schiedsrichter |
 | `hebocon/game.py` | HP-Regeln, reine Logik ohne Bild |
 | `hebocon/server.py` | Starlette: Anmeldung, Rechte, REST-Aktionen, WebSocket, Steckbriefbilder in `data/media/`, Meme-Dateien aus `memes/` |
-| `hebocon/library.py` | Soundboard: Ordner `memes/` überwachen, Index `data/soundboard.json` mit Kategorien und Reihenfolge, Dateityp am Inhalt prüfen, Upload, Freistellen im Hintergrund |
+| `hebocon/library.py` | Soundboard: Ordner `memes/` überwachen, Index `data/soundboard.json` mit Kategorien und Reihenfolge (die feste Rubrik „Uncategorized“ wird nur angezeigt, nie gespeichert), Dateityp am Inhalt prüfen, Upload, Freistellen im Hintergrund |
 | `hebocon/download.py` | Medien-Import per URL: nur öffentliche http(s)-Ziele, verbindet zur geprüften IP, folgt Weiterleitungen mit erneuter Prüfung |
 | `hebocon/memes.py` | Green Screen erkennen und entfernen (VP9 mit Alpha), Ergebnis prüfen, Original ersetzen |
 | `greenscreen.py` | Kommando: alle Videos in `memes/` freistellen |
@@ -37,12 +37,12 @@ KI-Client (GitHub Copilot oder OpenAI) auf seinem eigenen PC:
 
 | Datei | Aufgabe |
 | --- | --- |
-| `client.py` | Server suchen oder IP abfragen, `name:` und Passwort abfragen, anmelden, Seiten lokal ausliefern, pywebview-Fenster öffnen, Verbindung überwachen; bei `KI`/`AI` stattdessen `pilot.py` starten |
+| `client.py` | Server suchen oder IP abfragen, `name:` und Passwort abfragen, anmelden, Seiten lokal ausliefern, Ansicht der Bedienung unter `/prefs` merken, pywebview-Fenster öffnen, Verbindung überwachen; bei `KI`/`AI` stattdessen `pilot.py` starten |
 | `pilot.py` | KI-Client: Zugang (Copilot oder OpenAI-Schlüssel) und Modellwahl, Bluetooth zum Roboter, WebSocket mit Bild, Lagebild und Bild ans Modell, Werkzeuge, Taktik-Regler, Status an den Server |
 | `web/common.js` | Serveradresse und Token aus der URL, `api()`, `connect()`, Zeichnen |
 | `web/stage.html` | Bühne; beim Spieler zusätzlich eigener Ulti-Knopf und Wenig-HP-Vignette |
 | `web/operator.html` | Bedienung |
-| `client.json` | Letzter Server, Tokens je Server und Rolle, Vorgaben des KI-Clients |
+| `client.json` | Letzter Server, Tokens je Server und Rolle, Vorgaben des KI-Clients, Ansicht der Bedienung |
 
 ## Threads Server
 

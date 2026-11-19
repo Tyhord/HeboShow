@@ -16,8 +16,11 @@
   button:disabled { opacity: .55; cursor: not-allowed; }
   button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid #ffd194; outline-offset: 3px; }
 
-  .dashboard-shell { display: grid; grid-template-columns: minmax(310px, .92fr) minmax(480px, 1.35fr); gap: 20px; min-height: 100dvh;
-    padding: 22px; max-width: 1700px; margin: auto; }
+  /* Das Soundboard bekommt alles, was die Einstellungen nicht brauchen; eingeklappt bleibt nur eine schmale Leiste. */
+  .dashboard-shell { display: grid; grid-template-columns: minmax(0, 1fr) clamp(440px, 40vw, 720px); gap: 20px; min-height: 100dvh;
+    padding: 22px; max-width: 1900px; margin: auto; }
+  .dashboard-shell.animated { transition: grid-template-columns .25s ease; }
+  .dashboard-shell.settings-collapsed { grid-template-columns: minmax(0, 1fr) 64px; }
   .dashboard-heading { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
   .dashboard-heading h1 { margin: 0; font-size: clamp(24px, 2.5vw, 35px); letter-spacing: .025em; }
   .dashboard-heading p { margin: 5px 0 0; font-size: 15px; color: #bfcfe0; }
@@ -29,24 +32,30 @@
   .dashboard-panel { background: linear-gradient(145deg, #152238, #0b1221); border: 1px solid #526276; border-radius: 20px;
     box-shadow: 0 15px 40px #0007; min-width: 0; }
 
-  /* Feste Maximalhöhe, damit die Spielsteuerung oben immer sichtbar bleibt; nur die Kacheln scrollen. */
-  .soundboard { padding: 20px 22px; align-self: start; position: sticky; top: 20px; display: flex; flex-direction: column; gap: 14px;
-    max-height: calc(100dvh - 40px); overflow-y: auto; }
-  .soundboard h2 { font-size: 22px; margin: 0; }
-  .soundboard > p { color: #c3d2e1; font-size: 15px; line-height: 1.5; margin: -8px 0 0; }
-  .board-section { border: 1px solid; border-radius: 16px; padding: 14px 16px; min-width: 0; }
-  .board-section h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: .06em; text-transform: uppercase; }
+  /* Gleiche feste Höhe wie die Einstellungen: Spielsteuerung bleibt oben sichtbar, nur die Kacheln scrollen. */
+  .soundboard { padding: 16px 18px; position: sticky; top: 20px; display: flex; flex-direction: column; gap: 12px;
+    height: calc(100dvh - 120px); min-height: 620px; overflow: hidden; container: soundboard / inline-size; }
+  .board-section { border: 1px solid; border-radius: 16px; padding: 12px 14px; min-width: 0; }
+  .board-section h3 { margin: 0 0 8px; font-size: 15px; letter-spacing: .06em; text-transform: uppercase; }
   .game-section { flex: none; background: #2a1a0a8c; border-color: #f39200; }
   .game-section h3 { color: #ffd194; }
-  .media-section { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; background: #0d1828; border-color: #3f6c95; }
-  .media-section h3 { color: #9fd4ff; }
-  .game-section .fight-clock { font-size: clamp(30px, 3vw, 44px); }
-  .game-section button { min-height: 45px; }
+  .media-section { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: #0d1828; border-color: #3f6c95; }
+  .media-section h3 { color: #9fd4ff; margin: 0; }
+  .game-section .fight-clock { font-size: clamp(26px, 2.4vw, 38px); }
+  .game-section .fight-clock small { margin-top: 6px; }
+  .game-section .hp-row { margin-top: 8px; }
+  .game-section button { min-height: 42px; padding: 9px 14px; }
   .game-section button.action { background: #a65300; border-color: #f39200; }
-  .game-section .checkrow { margin: 14px 0 0 !important; font-size: 15px; }
-  .control-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+  .check-line { display: flex; flex-wrap: wrap; gap: 2px 20px; margin-top: 10px; }
+  .game-section .checkrow { margin: 0 !important; font-size: 14px; }
+  /* Breites Soundboard: Uhr und HP links, Knöpfe rechts, damit für die Kacheln mehr Höhe bleibt. */
+  @container soundboard (min-width: 820px) {
+    .game-body { display: grid; grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr); gap: 18px; align-items: center; }
+    .game-controls > .control-row:first-child { margin-top: 0; }
+  }
+  .control-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
   .row-label { flex: 0 0 64px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #c3d2e1; }
-  .robot-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+  .robot-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
   .robot-col { --c: #00e5ff; min-width: 0; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); border-radius: 12px; padding: 8px 10px; }
   .robot-col.red { --c: #ff2e88; }
   .robot-col .row-label { display: block; color: var(--c); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -64,18 +73,40 @@
   .ulti-trigger.ready { animation: ulti-ready .7s ease-in-out infinite alternate; }
   .ulti-trigger.used { opacity: .35; text-decoration: line-through; }
   @keyframes ulti-ready { to { box-shadow: 0 0 18px var(--c); filter: brightness(1.4); } }
-  .sound-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; }
-  .sound-actions button { min-height: 45px; }
-  .sound-actions .upload-button { font-size: 15px; font-weight: 700; border: 1px solid #f39200; border-radius: 12px; background: #a65300; padding: 12px 18px; }
-  .sound-actions .upload-button:hover { background: #c46400; }
+  .media-head { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 10px; }
+  .media-head h3 { flex: 1; min-width: 0; }
+  .media-head button { min-height: 40px; padding: 8px 12px; }
+  .media-head .upload-button { font-size: 15px; font-weight: 700; border: 1px solid #f39200; border-radius: 12px; background: #a65300; padding: 8px 16px; }
+  .media-head .upload-button:hover { background: #c46400; }
+  .view-toggle { display: inline-flex; border: 1px solid #65758d; border-radius: 12px; overflow: hidden; }
+  .view-toggle button { border: 0; border-radius: 0; background: transparent; width: 42px; padding: 0; font-size: 19px; }
+  .view-toggle button[aria-pressed="true"] { background: #3f6c95; color: #fff; }
   .board-tile.is-processing { border: 2px dashed #58a6ff; cursor: progress; opacity: .8; }
   .board-tile.is-processing small { color: #a5d6ff; font-weight: 700; }
-  .board-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 118px; gap: 12px; border-radius: 14px; }
-  /* Spaltenzahl nach der echten Breite des Soundboards statt des Fensters: Vollbild 3, halber Bildschirm 2. */
-  .media-section { container: board / inline-size; }
-  @container board (min-width: 440px) { .board-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-  .board-cats { flex: 0 1 auto; min-height: 130px; overflow-y: auto; overscroll-behavior: contain; padding: 2px 4px 2px 2px;
-    display: flex; flex-direction: column; gap: 16px; }
+  /* auto-fill statt fester Spaltenzahl: Klappen die Einstellungen ein, passen automatisch mehr Kacheln in eine Reihe. */
+  .board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: 82px; gap: 10px; border-radius: 14px; }
+  .board-cats { flex: 1 1 auto; min-height: 130px; overflow-y: auto; overscroll-behavior: contain; padding: 2px 4px 2px 2px;
+    display: flex; flex-direction: column; gap: 14px; }
+  .board-cats.is-list .board-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); grid-auto-rows: 44px; gap: 6px; }
+  .board-cats.is-list .board-tile { flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; padding: 0 12px;
+    border-radius: 10px; }
+  .board-cats.is-list .board-tile .tile-symbol { font-size: 19px; }
+  .board-cats.is-list .board-tile strong { flex: 1; font-size: 15px; -webkit-line-clamp: 1; }
+  .board-cats.is-list .board-tile.is-playing::after { content: "LÄUFT"; flex: none; font-size: 11px; font-weight: 900; letter-spacing: .08em;
+    color: #9df0ad; }
+  .board-cats.is-list .tile-wrap .board-tile { padding-right: 84px; }
+  .board-cats.is-list .tile-rename { top: 6px; right: 6px; }
+  .board-cats.is-list .tile-remove { top: 6px; right: 44px; }
+  .board-cats.is-list .tile-name-edit { top: 4px; bottom: 4px; }
+  .board-cat.cat-dragging { opacity: .35; }
+  /* Einfügemarke für ganze Kategorien als Strich über bzw. unter dem Block. */
+  .board-cat { position: relative; }
+  .board-cat.cat-drop-before::before, .board-cat.cat-drop-after::after { content: ""; position: absolute; left: 0; right: 0; height: 4px;
+    border-radius: 2px; background: #f39200; box-shadow: 0 0 8px #f39200; }
+  .board-cat.cat-drop-before::before { top: -9px; }
+  .board-cat.cat-drop-after::after { bottom: -9px; }
+  .cat-grip { cursor: grab; background: transparent; border-color: transparent; color: #8fa6c2; font-size: 17px !important; }
+  .cat-grip:hover { color: #fff; border-color: #65758d; }
   .cat-add { display: flex; gap: 8px; align-items: center; }
   .cat-add button { min-height: 38px; padding: 6px 14px; font-size: 14px; font-weight: 700; border-style: dashed; background: transparent; }
   .cat-add:has(input) button { display: none; }
@@ -93,35 +124,43 @@
   .tile-wrap.drop-after::after { right: -8px; }
   .tile-wrap.dragging { opacity: .35; }
   .board-grid.drop-target { outline: 2px dashed #f39200; outline-offset: 4px; }
-  .board-tile { height: 100%; min-width: 0; padding: 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; justify-content: center;
-    text-align: left; background: #17263b; border: 1px solid #65758d; border-radius: 16px; overflow: hidden; font-weight: 400; }
+  .board-tile { height: 100%; min-width: 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; justify-content: center;
+    text-align: left; background: #17263b; border: 1px solid #65758d; border-radius: 14px; overflow: hidden; font-weight: 400; }
   .board-tile:hover:not(:disabled) { background: #34445b; }
-  .board-tile .tile-symbol { font-size: 27px; }
+  .board-tile .tile-symbol { font-size: 22px; line-height: 1; }
   /* Lange Namen kürzen, damit alle Kacheln gleich groß bleiben; der volle Name steht im Tooltip. */
-  .board-tile strong { font-size: 16px; max-width: 100%; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2;
+  .board-tile strong { font-size: 15px; max-width: 100%; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2;
     -webkit-box-orient: vertical; overflow: hidden; }
-  .board-tile small { font-size: 13px; color: #c7d7e9; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .board-tile small { font-size: 12px; color: #c7d7e9; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .board-tile small:empty { display: none; }
   .board-tile.is-playing { background: #0f3b2a; border: 2px solid #3fb950; box-shadow: 0 0 14px #3fb95066; }
-  .board-tile.is-playing small { color: #9df0ad; font-weight: 700; }
   .board-tile.is-empty { border-style: dashed; border-color: #76889b; color: #c8d6e9; cursor: default; }
   /*noinspection CssUnusedSymbol*/
   .tile-wrap { position: relative; }
   /*noinspection CssUnusedSymbol*/
-  .tile-wrap .board-tile { width: 100%; height: 100%; padding-right: 44px; }
+  .tile-wrap .board-tile { width: 100%; height: 100%; padding-right: 40px; }
+  /* Umbenennen und Löschen nur bei Bedarf zeigen, damit die Kacheln ruhig bleiben. */
   /*noinspection CssUnusedSymbol*/
-  .tile-rename { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 8px; font-size: 15px; }
+  .tile-rename { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; padding: 0; border-radius: 8px; font-size: 14px;
+    opacity: 0; transition: opacity .15s; }
+  .tile-wrap:hover .tile-rename, .tile-wrap:focus-within .tile-rename { opacity: 1; }
   /*noinspection CssUnusedSymbol*/
-  .tile-remove { top: 46px; }
+  .tile-remove { top: 42px; }
   /*noinspection CssUnusedSymbol*/
-  .tile-name-edit { position: absolute; left: 10px; right: 10px; bottom: 10px; font-size: 15px; }
-  .board-footer { flex: none; margin-top: 12px; padding: 13px; border-radius: 12px; background: #0a1322; border: 1px solid #43546b; color: #dce7f5;
-    font-size: 14px; line-height: 1.5; }
-
-  .dashboard-settings { padding: 0; overflow: hidden; min-height: 620px; height: calc(100dvh - 120px); position: sticky; top: 20px; }
+  .tile-name-edit { position: absolute; left: 8px; right: 8px; bottom: 8px; font-size: 15px; }
+  .dashboard-settings { padding: 0; overflow: hidden; min-height: 620px; height: calc(100dvh - 120px); position: sticky; top: 20px; min-width: 0; }
   .panel { display: flex; flex-direction: column; height: 100%; }
-  .panel h2 { flex: none; margin: 0; padding: 23px 24px 17px; border-bottom: 1px solid #ffffff1c; font-size: 20px; font-weight: 900;
-    letter-spacing: .045em; line-height: 1.4; text-transform: uppercase; color: #f7f9ff; }
-  .settings-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 165px minmax(0, 1fr); overflow: hidden; }
+  .panel h2 { flex: none; display: flex; align-items: center; gap: 10px; margin: 0; padding: 18px 16px 14px 24px; border-bottom: 1px solid #ffffff1c;
+    font-size: 20px; font-weight: 900; letter-spacing: .045em; line-height: 1.4; text-transform: uppercase; color: #f7f9ff; white-space: nowrap; }
+  .panel h2 span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .settings-toggle { flex: none; width: 40px; height: 40px; padding: 0; font-size: 18px; border-radius: 10px; }
+  .settings-collapsed .panel h2 { flex-direction: column; padding: 12px 0; border-bottom: 0; }
+  .settings-collapsed .panel h2 span, .settings-collapsed .settings-layout { display: none; }
+  /* Eingeklappt bleibt ein senkrechter Schriftzug, damit klar ist, was sich hinter der Leiste verbirgt. */
+  .settings-rail { display: none; writing-mode: vertical-rl; margin: 6px auto 0; padding: 14px 0; font-size: 13px; font-weight: 800;
+    letter-spacing: .18em; text-transform: uppercase; color: #c3d2e1; background: transparent; border: 0; cursor: pointer; }
+  .settings-collapsed .settings-rail { display: block; }
+  .settings-rail:hover { color: #ffd194; }
   .settings-tabs { padding: 14px 9px; border-right: 1px solid #ffffff1c; display: flex; flex-direction: column; gap: 4px;
     background: #060b1555; overflow-y: auto; min-height: 0; }
   .settings-tabs button { border: 1px solid transparent; background: transparent; text-align: left; border-radius: 10px; padding: 12px 11px;
@@ -214,11 +253,15 @@
   .vs-frame iframe { width: 1280px; height: 720px; border: 0; transform: scale(.5); transform-origin: 0 0; pointer-events: none; }
   [hidden] { display: none !important; }
   @media (max-width: 900px) {
-    .dashboard-shell { grid-template-columns: 1fr; padding: 14px; }
+    .dashboard-shell, .dashboard-shell.settings-collapsed { grid-template-columns: 1fr; padding: 14px; }
     .soundboard, .dashboard-settings { position: static; }
-    .soundboard { max-height: none; overflow: visible; }
+    .soundboard { height: auto; min-height: 0; overflow: visible; }
     .board-cats { overflow: visible; }
     .dashboard-settings { height: 720px; min-height: 0; }
+    .settings-collapsed .dashboard-settings { height: auto; }
+    .settings-collapsed .panel h2 { flex-direction: row; padding: 12px 16px; }
+    .settings-collapsed .panel h2 span { display: block; }
+    .settings-collapsed .settings-rail { display: none; }
   }
   @media (max-width: 580px) {
     .settings-layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
@@ -239,13 +282,14 @@
   </header>
 
   <section class="soundboard dashboard-panel" aria-label="Spielsteuerung und Meme- &amp; Soundboard">
-    <h2>🎛️ Meme- &amp; Soundboard</h2>
-    <p>Bleibt sichtbar, während du rechts zwischen den Einstellungen wechselst.</p>
-
     <section class="board-section game-section" aria-labelledby="gameTitle">
       <h3 id="gameTitle">🎮 Spielsteuerung</h3>
+      <div class="game-body">
+      <div class="game-status">
       <div class="fight-clock" id="timer">00:00<small>KAMPFZEIT</small></div>
       <div id="hp"></div>
+      </div>
+      <div class="game-controls">
       <div class="control-row" role="group" aria-label="Ablauf">
         <span class="row-label">Ablauf</span>
         <button id="start" type="button" class="action icon" title="Kampf starten (S)">▶</button>
@@ -275,14 +319,23 @@
         <button id="powerup" type="button" class="icon" title="Power-up spawnen (P)">✚</button>
         <button id="shrink" type="button" class="icon" title="Arena schrumpfen (K)">⇲</button>
       </div>
-      <label class="checkrow" title="Blendet Lebensleisten, Kampfzeit und Statuszeilen in der Kampfansicht aus, etwa für Ansagen."><input type="checkbox" id="hud" checked> Lebensleisten &amp; Timer in der Kampfansicht</label>
+      </div>
+      </div>
+      <div class="check-line">
+        <label class="checkrow" title="Blendet Lebensleisten, Kampfzeit und Statuszeilen in der Kampfansicht aus, etwa für Ansagen."><input type="checkbox" id="hud" checked> Lebensleisten &amp; Timer in der Kampfansicht</label>
+        <label class="checkrow" title="Aus: Nach „Bereit“ erscheint direkt der VS-Bildschirm. Gilt ab dem nächsten Kampf."><input type="checkbox" id="introOn" checked> Play intro animation before match</label>
+      </div>
     </section>
 
     <section class="board-section media-section" aria-labelledby="mediaTitle">
-      <h3 id="mediaTitle">🔊 Memes &amp; Sounds</h3>
-      <div class="sound-actions">
+      <div class="media-head">
+        <h3 id="mediaTitle">🔊 Memes &amp; Sounds</h3>
         <button id="uploadOpen" type="button" class="upload-button" title="Datei oder URL ins Soundboard holen">⤒ Upload</button>
         <button id="stopMedia" type="button" class="icon" title="Alle Medien stoppen">⏹</button>
+        <div class="view-toggle" role="group" aria-label="Ansicht">
+          <button id="viewGrid" type="button" aria-pressed="true" title="Rasteransicht: kompakte Kacheln, Spaltenzahl passt sich der Breite an">▦</button>
+          <button id="viewList" type="button" aria-pressed="false" title="Listenansicht: kompakte Zeilen mit Name und Wiedergabestatus">☰</button>
+        </div>
       </div>
       <div id="board" class="board-cats">
         <div class="cat-add" id="catAdd"><button id="addCategory" type="button" title="Neue Kategorie anlegen">＋ Kategorie</button></div>
@@ -291,14 +344,15 @@
         <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erster Sound</strong><small>Über „Upload“ hinzufügen</small></div>
         <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erstes Meme</strong><small>Bild oder Video hochladen</small></div>
       </template>
-      <div class="board-footer">Alle Dateien im Ordner <code>memes/</code> des Servers erscheinen hier von selbst und bleiben nach einem Neustart erhalten. Ein Klick startet, ein zweiter stoppt. Kacheln per Ziehen sortieren oder in eine andere Kategorie schieben; ✎ benennt um, 🗑 löscht.</div>
     </section>
   </section>
 
   <section class="dashboard-settings dashboard-panel" aria-label="Einstellungen">
     <div class="panel">
-      <h2>⚙ Einstellungen</h2>
-      <div class="settings-layout">
+      <h2><span>⚙ Einstellungen</span><button id="settingsToggle" type="button" class="settings-toggle" aria-controls="settingsBody"
+        aria-expanded="true" title="Einstellungen einklappen: mehr Platz fürs Soundboard">⇥</button></h2>
+      <button id="settingsRail" type="button" class="settings-rail" title="Einstellungen ausklappen">⚙ Einstellungen</button>
+      <div class="settings-layout" id="settingsBody">
         <nav class="settings-tabs" id="tabs" aria-label="Einstellungsbereiche">
           <button data-tab="kamera">📷 Kamera</button>
           <button data-tab="spielfeld">🔳 Spielfeld</button>
@@ -399,7 +453,7 @@
 
 <dialog id="uploadDialog" aria-labelledby="uploadTitle">
   <h2 id="uploadTitle">⤒ Medien hinzufügen</h2>
-  <p class="hint">Audio, Video oder Bild bis 100 MB. Landet vorne in „Standard“ und bleibt im Ordner <code>memes/</code> des Servers.</p>
+  <p class="hint">Audio, Video oder Bild bis 100 MB. Landet vorne in „Uncategorized“ und bleibt im Ordner <code>memes/</code> des Servers.</p>
   <form id="uploadForm">
     <label class="upload-field">Datei hochladen
       <input id="uploadFile" type="file" multiple accept="audio/*,image/*,video/*,.mp4,.m4v,.webm,.mov,.mkv,.mp3,.wav,.ogg,.m4a,.aac,.flac,.opus,.gif"></label>
@@ -468,6 +522,7 @@ byId("powerup").onclick = () => run("spawn", { kind: "powerup" });
 byId("shrink").onclick = () => run("shrink");
 byId("abort").onclick = () => run("abort");
 byId("hud").onchange = (e) => run("hud", { on: e.target.checked });
+byId("introOn").onchange = (e) => run("intro", { on: e.target.checked });
 document.querySelectorAll("#tabs button").forEach((b) => {
   b.onclick = () => { picked = b.dataset.tab; if (state) ui(state); };
 });
@@ -815,15 +870,19 @@ const EMPTY_TILES = [...byId("emptyTiles").content.children].map((n) => n.cloneN
 const board = byId("board");
 let categories = [];
 let dragged = null;
+let draggedCat = null;
+const UNSORTED = "uncategorized";
 
+// Statt Beschreibungstext zeigt das Symbol den Zustand; der Tooltip erklärt den nächsten Klick.
 function updateTiles(memes = [], keying = {}) {
   const running = new Set(memes.map((m) => m.media.url));
   tiles.forEach((tile, url) => {
     const on = running.has(url);
+    const busy = tile.classList.contains("is-processing");
     tile.classList.toggle("is-playing", on);
-    tile.querySelector("small").textContent = tile.classList.contains("is-processing")
-      ? `Green Screen wird entfernt … ${Math.round(100 * (keying[url] || 0))} %`
-      : on ? "⏹ Läuft – Klick stoppt" : "In Kampfansicht abspielen";
+    tile.querySelector(".tile-symbol").textContent = on ? "⏹" : tile.dataset.icon;
+    tile.querySelector("small").textContent = busy ? `Green Screen wird entfernt … ${Math.round(100 * (keying[url] || 0))} %` : "";
+    tile.title = busy ? "Wird verarbeitet" : on ? "Läuft – Klick stoppt" : "In der Kampfansicht abspielen";
   });
 }
 
@@ -842,8 +901,9 @@ function addTile(media) {
   const tile = document.createElement("button");
   tile.type = "button";
   tile.className = "board-tile";
-  tile.innerHTML = '<span class="tile-symbol"></span><strong></strong><small>In Kampfansicht abspielen</small>';
-  tile.querySelector(".tile-symbol").textContent = ICON[media.mime.split("/")[0]] || "▶";
+  tile.innerHTML = '<span class="tile-symbol"></span><strong></strong><small></small>';
+  tile.dataset.icon = ICON[media.mime.split("/")[0]] || "▶";
+  tile.querySelector(".tile-symbol").textContent = tile.dataset.icon;
   const label = tile.querySelector("strong");
   label.textContent = media.name;
   label.title = media.name;
@@ -883,20 +943,46 @@ function addSection(c) {
   const s = { section: document.createElement("section"), head: document.createElement("div"),
     title: document.createElement("strong"), grid: document.createElement("div"), drop: document.createElement("div"), buttons: {} };
   s.section.className = "board-cat";
+  s.section.dataset.category = c.id;
   s.head.className = "cat-head";
   s.grid.className = "board-grid";
   s.grid.dataset.category = c.id;
   s.drop.className = "cat-drop";
   s.drop.textContent = "Leer – Kacheln hierher ziehen";
   s.head.append(s.title);
-  // „Standard“ bleibt fest oben und nimmt die Kacheln gelöschter Kategorien auf.
-  if (c.id !== "standard") {
+  // „Uncategorized“ sammelt nur nicht einsortierte Kacheln und bleibt deshalb fest unten.
+  if (c.id !== UNSORTED) {
+    s.grip = smallButton("⠿", "Kategorie verschieben: ziehen oder Pfeiltasten", null, "cat-grip");
+    s.grip.draggable = true;
+    s.grip.ondragstart = (e) => {
+      draggedCat = s.section;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", s.name);
+      e.dataTransfer.setDragImage(s.section, 24, 18);
+      s.section.classList.add("cat-dragging");
+    };
+    s.grip.ondragend = () => {
+      s.section.classList.remove("cat-dragging");
+      draggedCat = null;
+      clearDrop();
+    };
+    s.grip.onkeydown = (e) => {
+      const step = { ArrowUp: -1, ArrowDown: 1 }[e.key];
+      if (!step) return;
+      // Sonst greifen die globalen Tastenkürzel.
+      e.preventDefault();
+      e.stopPropagation();
+      const movable = categories.filter((x) => x.id !== UNSORTED);
+      const index = movable.findIndex((x) => x.id === c.id) + step;
+      if (index >= 0 && index < movable.length) moveCategory(c.id, index).then(() => s.grip.focus());
+    };
+    s.head.prepend(s.grip);
+  }
+  // „Standard“ nimmt die Kacheln gelöschter Kategorien auf und lässt sich daher weder umbenennen noch löschen.
+  if (c.id !== "standard" && c.id !== UNSORTED) {
     const path = `/categories/${c.id}`;
-    const move = (step) => change(path, "PATCH", { index: categories.findIndex((x) => x.id === c.id) - 1 + step });
     s.buttons.rename = smallButton("✎", "Kategorie umbenennen",
       () => inlineEdit(s.head, s.name, (name) => change(path, "PATCH", { name }), "cat-name-edit"));
-    s.buttons.up = smallButton("▲", "Kategorie nach oben", () => move(-1));
-    s.buttons.down = smallButton("▼", "Kategorie nach unten", () => move(1));
     s.buttons.remove = smallButton("🗑", "Kategorie löschen", () => {
       if (confirm(`Kategorie „${s.name}“ löschen? Ihre Kacheln wandern nach „Standard“.`)) change(path, "DELETE");
     });
@@ -905,6 +991,10 @@ function addSection(c) {
   s.section.append(s.head, s.grid);
   sections.set(c.id, s);
   return s;
+}
+
+function moveCategory(id, index) {
+  return change(`/categories/${id}`, "PATCH", { index });
 }
 
 // Nur bei Änderung umhängen: umgehängte Knoten verlieren sonst Fokus und offene Eingabefelder.
@@ -942,20 +1032,16 @@ async function loadBoard() {
     tile.classList.toggle("is-processing", Boolean(m.processing));
     tile.disabled = Boolean(m.processing);
     wrap.querySelectorAll(".tile-rename").forEach((b) => { b.disabled = Boolean(m.processing); });
-    (byCat.get(m.category) || byCat.get("standard")).push(wrap);
+    (byCat.get(m.category) || byCat.get(UNSORTED)).push(wrap);
   }
   for (const id of [...sections.keys()]) if (!byCat.has(id)) sections.delete(id);
-  const nodes = categories.map((c, i) => {
+  const nodes = categories.map((c) => {
     const s = sections.get(c.id) || addSection(c);
     s.name = c.name;
     s.title.textContent = c.name;
     s.title.title = c.name;
-    if (s.buttons.up) {
-      s.buttons.up.disabled = i <= 1;
-      s.buttons.down.disabled = i === categories.length - 1;
-    }
     const items = byCat.get(c.id);
-    setChildren(s.grid, items.length ? items : !list.length && c.id === "standard" ? EMPTY_TILES : [s.drop]);
+    setChildren(s.grid, items.length ? items : !list.length && c.id === UNSORTED ? EMPTY_TILES : [s.drop]);
     return s.section;
   });
   setChildren(board, [byId("catAdd"), ...nodes]);
@@ -1012,11 +1098,28 @@ function dropSpot(grid, e) {
 }
 
 function clearDrop() {
-  board.querySelectorAll(".drop-before, .drop-after, .drop-target")
-    .forEach((el) => el.classList.remove("drop-before", "drop-after", "drop-target"));
+  board.querySelectorAll(".drop-before, .drop-after, .drop-target, .cat-drop-before, .cat-drop-after")
+    .forEach((el) => el.classList.remove("drop-before", "drop-after", "drop-target", "cat-drop-before", "cat-drop-after"));
+}
+
+// Erste Kategorie, über deren Mitte der Zeiger steht; „Uncategorized“ zählt nie mit, sie bleibt unten.
+function catSpot(e) {
+  const items = [...board.querySelectorAll(":scope > .board-cat")]
+    .filter((x) => x !== draggedCat && x.dataset.category !== UNSORTED);
+  const index = items.findIndex((x) => e.clientY < x.getBoundingClientRect().top + x.getBoundingClientRect().height / 2);
+  return { items, index: index < 0 ? items.length : index };
 }
 
 board.addEventListener("dragover", (e) => {
+  if (draggedCat) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const { items, index } = catSpot(e);
+    clearDrop();
+    if (index < items.length) items[index].classList.add("cat-drop-before");
+    else items.at(-1)?.classList.add("cat-drop-after");
+    return;
+  }
   const grid = e.target.closest?.(".board-grid");
   if (!dragged || !grid) return;
   e.preventDefault();
@@ -1029,6 +1132,15 @@ board.addEventListener("dragover", (e) => {
 });
 board.addEventListener("dragleave", (e) => { if (!board.contains(e.relatedTarget)) clearDrop(); });
 board.addEventListener("drop", async (e) => {
+  if (draggedCat) {
+    e.preventDefault();
+    const section = draggedCat;
+    const { items, index } = catSpot(e);
+    clearDrop();
+    board.insertBefore(section, items[index] || sections.get(UNSORTED)?.section || null);
+    await moveCategory(section.dataset.category, index);
+    return;
+  }
   const grid = e.target.closest?.(".board-grid");
   if (!dragged || !grid) return;
   e.preventDefault();
@@ -1158,6 +1270,7 @@ function ui(s) {
     }
   }
   if (document.activeElement !== byId("hud")) byId("hud").checked = s.hud !== false;
+  if (document.activeElement !== byId("introOn")) byId("introOn").checked = s.play_intro !== false;
   byId("hp").replaceChildren(...s.robots.flatMap((r) => {
     const row = document.createElement("div");
     row.className = "hp-row";
@@ -1305,6 +1418,46 @@ connect((s, bitmap) => {
   draw();
 });
 window.addEventListener("resize", draw);
+
+// Gerätebezogene Ansicht liegt im Client (client.json), weil WebView2 ohne festes Profil keinen localStorage behält.
+const shell = document.querySelector(".dashboard-shell");
+const prefs = {};
+
+function savePref(key, value) {
+  prefs[key] = value;
+  fetch("/prefs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ [key]: value }) })
+    .catch(() => {});
+}
+
+function applyPrefs() {
+  const closed = prefs.settings === "collapsed";
+  shell.classList.toggle("settings-collapsed", closed);
+  const toggle = byId("settingsToggle");
+  toggle.textContent = closed ? "⇤" : "⇥";
+  toggle.title = closed ? "Einstellungen ausklappen" : "Einstellungen einklappen: mehr Platz fürs Soundboard";
+  toggle.setAttribute("aria-expanded", String(!closed));
+  const list = prefs.view === "list";
+  board.classList.toggle("is-list", list);
+  byId("viewGrid").setAttribute("aria-pressed", String(!list));
+  byId("viewList").setAttribute("aria-pressed", String(list));
+}
+
+function toggleSettings() {
+  savePref("settings", prefs.settings === "collapsed" ? "open" : "collapsed");
+  applyPrefs();
+}
+byId("settingsToggle").onclick = toggleSettings;
+byId("settingsRail").onclick = toggleSettings;
+byId("viewGrid").onclick = () => { savePref("view", "grid"); applyPrefs(); };
+byId("viewList").onclick = () => { savePref("view", "list"); applyPrefs(); };
+// Die Vorschau misst ihre Größe beim Zeichnen; nach dem Ein-/Ausklappen sonst verzerrt bis zum nächsten Bild.
+shell.addEventListener("transitionend", (e) => { if (e.target === shell) draw(); });
+
+fetch("/prefs").then((r) => r.json()).then((p) => Object.assign(prefs, p)).catch(() => {}).finally(() => {
+  applyPrefs();
+  // Erst nach dem gespeicherten Zustand animieren, sonst klappt das Panel beim Laden sichtbar zu.
+  requestAnimationFrame(() => shell.classList.add("animated"));
+});
 </script>
 </body>
 </html>

@@ -306,6 +306,28 @@ def test_intro_delays_fight_and_timer_counts_up(app):
     assert app.state(clock.t)["elapsed"] is None
 
 
+def test_intro_can_be_skipped_and_choice_survives_restart(app, tmp_path):
+    path = tmp_path / "match.json"
+    assert App(Settings(_env_file=None), match_file=path).play_intro is True
+    app.match_file = path
+    app.cfg.intro_s = 5.0
+    app.act("intro", {"on": False})
+    assert App(Settings(_env_file=None), match_file=path).play_intro is False
+    assert app.state(time.monotonic())["play_intro"] is False
+    app.act("corners", {"points": [list(c) for c in CORNERS]})
+    frames(app, square=(220, 200), triangle=(420, 300))
+    act(app, "start", names=["A", "B"])
+    # Ohne Intro sofort der VS-Bildschirm, und der wartet auf Start statt selbst loszulegen.
+    assert app.phase == "ready" and app.state(time.monotonic())["vs"] is True
+    clock = Clock()
+    clock.step(app, (220, 200), (420, 300), dt=60.0)
+    assert app.phase == "ready" and app.game is None
+    app.act("start", {"names": []})
+    assert app.phase == "countdown"
+    path.write_text("kaputt")
+    assert App(Settings(_env_file=None), match_file=path).play_intro is True
+
+
 def test_click_swaps_assignment(app):
     app.act("corners", {"points": [list(c) for c in CORNERS]})
     frames(app, square=(220, 200), triangle=(420, 300))

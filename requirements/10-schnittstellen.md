@@ -54,16 +54,19 @@ fehlendem Recht 403 und `{"ok": false, "message"}`.
 | --- | --- |
 | `POST /media` | Datei hochladen: roher Körper, `Content-Type` der Datei, Kopf `X-Name` (URL-kodiert). Ohne `X-Board: 1` ein Steckbriefbild (`/media/<key>`, bis zum Neustart). Mit `X-Board: 1` eine Soundboard-Kachel in `memes/`; `X-Key: 1` stellt ein Video zusätzlich frei. Der Typ wird am Inhalt geprüft. Antwort `{"ok", "url", "file", "name", "mime", "category", "cutout", "processing"}`, höchstens 100 MB |
 | `POST /media/url` | Kachel von einer Adresse holen, Körper `{"url", "key"?}`. Nur http/https ohne Zugangsdaten; Ziele im lokalen oder privaten Netz (auch nach DNS-Auflösung und Weiterleitungen) lehnt der Server ab. Antwort wie `POST /media` |
-| `GET /media` | Soundboard: `{"categories": [{"id", "name"}], "memes": [{"url", "file", "name", "mime", "category", "cutout", "processing"}]}`, beides in Board-Reihenfolge; `categories[0]` ist immer `standard`; `cutout: true` heißt freigestelltes Video mit Alphakanal, die Bühne zeigt es ohne Rahmen; `processing: true` heißt, das Grün wird gerade entfernt |
+| `GET /media` | Soundboard: `{"categories": [{"id", "name"}], "memes": [{"url", "file", "name", "mime", "category", "cutout", "processing"}]}`, beides in Board-Reihenfolge; `standard` steht irgendwo, `uncategorized` immer zuletzt (Kacheln ohne Kategorie, auch neu gefundene und hochgeladene); `cutout: true` heißt freigestelltes Video mit Alphakanal, die Bühne zeigt es ohne Rahmen; `processing: true` heißt, das Grün wird gerade entfernt |
 | `GET /media/<key>` | Steckbriefbild abrufen |
 | `GET /memes/<datei>` | Meme-Datei abrufen (nur Dateien, die im Soundboard stehen) |
 | `PATCH /memes/<datei>` | Kachel umbenennen, Körper `{"name"}`, oder verschieben, Körper `{"category", "index"}` (`index` zählt nur die Kacheln der Zielkategorie ohne die verschobene) |
 | `DELETE /memes/<datei>` | Kachel und Datei löschen; während des Freistellens nicht möglich |
 | `POST /categories` | Kategorie anlegen, Körper `{"name"}`; Antwort `{"ok", "id", "name"}`. Namen sind ohne Groß-/Kleinschreibung eindeutig |
-| `PATCH /categories/<id>` | umbenennen `{"name"}` oder verschieben `{"index"}` (0 = direkt nach `standard`) |
-| `DELETE /categories/<id>` | Kategorie löschen; ihre Kacheln wandern ans Ende von `standard`. `standard` selbst ist gesperrt |
+| `PATCH /categories/<id>` | umbenennen `{"name"}` oder verschieben `{"index"}` (zählt die Kategorien ohne die verschobene und ohne `uncategorized`; 0 = ganz oben). `standard` lässt sich verschieben, aber nicht umbenennen; `uncategorized` ist ganz gesperrt |
+| `DELETE /categories/<id>` | Kategorie löschen; ihre Kacheln wandern ans Ende von `standard`. `standard` und `uncategorized` sind gesperrt |
 
 `url` ist relativ zum Server (`/memes/<datei>` URL-kodiert); die Seiten setzen die Serveradresse davor.
+
+Der Client selbst bietet der Bedienung `GET /prefs` und `POST /prefs` (`{"settings", "view"}`)
+an, damit Einstellungsleiste und Grid/Liste je Gerät erhalten bleiben.
 
 ## Aktionen
 
@@ -77,7 +80,8 @@ fehlendem Recht 403 und `{"ok": false, "message"}`.
 | `reset_arena` | – | Ecken verwerfen, zurück zur Kalibrierung |
 | `new_battle` | – | Neue Registrierung, beide Roboter werden automatisch erkannt |
 | `pick` | `{"x", "y", "slot"}` | Roboter unter dem Klick dem Slot 1 oder 2 zuordnen |
-| `start` | `{"names": ["…", "…"]}` | Kampf starten: Intro, dann VS-Bildschirm (`ready`); in `ready` startet es den Countdown |
+| `start` | `{"names": ["…", "…"]}` | Kampf starten: Intro (wenn eingeschaltet), dann VS-Bildschirm (`ready`); in `ready` startet es den Countdown |
+| `intro` | `{"on": bool}` | Intro vor dem Kampf ein- oder ausschalten; gilt ab dem nächsten Start, gespeichert in `data/match.json` |
 | `spawn` | `{"kind": "obstacle" \| "powerup"}` | Objekt von Hand erzeugen |
 | `shrink` | – | Arena schrumpfen lassen (nur im Kampf, einmal) |
 | `hud` | `{"on": bool}` | Kampf-HUD auf der Bühne ein- oder ausblenden |
@@ -93,7 +97,7 @@ fehlendem Recht 403 und `{"ok": false, "message"}`.
 | `say` | `{"player": 1 \| 2, "text"}` | Sprechblase über dem Roboter, `HEBOCON_SAY_S` Sekunden, höchstens 80 Zeichen; leerer Text löscht sie. Nutzt vor allem der KI-Client. |
 | `ai_status` | `{"player": 1 \| 2, "status": {…}}` | Nur KI-Client: meldet seinen Zustand für die Bedienung. Erlaubte Felder `status`, `model`, `steering`, `robot`, `bluetooth`, `calls`, `max_calls`, `tactic`, `key`, `comment`, `error`; Texte höchstens 120 Zeichen, alles andere wird verworfen. Gilt bis der Platz frei wird. |
 
-Während `busy` gesetzt ist, sind nur `camera`, `abort`, `spawn`, `shrink`, `hud`, `profile`,
+Während `busy` gesetzt ist, sind nur `camera`, `abort`, `spawn`, `shrink`, `hud`, `intro`, `profile`,
 `cue`, `ko`, `ulti`, `balancing`, `balancing_reset`, `name`, `kick`, `say` und
 `ai_status` erlaubt.
 
@@ -124,6 +128,7 @@ Alle Koordinaten in **Pixeln des Originalbildes** (`frame.w` × `frame.h`).
 | `countdown` | nur in `countdown`: Sekunden bis zum Kampfbeginn, sonst `null` |
 | `elapsed` | Kampfzeit in Sekunden ab Ende des Countdowns, steht beim Ende still; `null` vor dem Kampf |
 | `hud` | Ob die Bühne das Kampf-HUD zeigt |
+| `play_intro` | Ob vor dem Kampf das Intro läuft |
 | `vs` | Ob die Bühne den VS-Bildschirm zeigt: genau in Phase `ready` |
 | `names` | Die zwei Roboternamen (für den VS-Bildschirm) |
 | `profiles` | Zwei Steckbriefe `{"image", "team", "weight", "height", "slogan"}` für den VS-Bildschirm |

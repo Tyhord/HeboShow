@@ -60,11 +60,18 @@ Optik nach `hebo-client/design-reference/moderator (1).html`: Hintergrund `#090f
 Paneele mit blauem Verlauf, orange Akzente. Kopfzeile „MODERATOR CONTROL“ mit Untertitel,
 rechts „● Server verbunden“ bzw. „○ Server offline“ und „↗ Kampfansicht öffnen“.
 
-**Links: Meme- & Soundboard** (bleibt beim Scrollen stehen). Es enthält die gesamte
-Spielsteuerung und das Soundboard in zwei optisch getrennten Blöcken: oben „🎮
-Spielsteuerung“ mit orangem Rahmen, darunter „🔊 Memes & Sounds“ mit blauem Rahmen.
-Reicht die Fensterhöhe nicht, scrollen nur die Kacheln, die Spielsteuerung bleibt sichtbar.
-Jeden Knopf gibt es genau einmal in der Bedienung.
+**Links: Meme- & Soundboard** (bleibt beim Scrollen stehen) ist der Hauptteil der Bedienung.
+Es enthält die gesamte Spielsteuerung und das Soundboard in zwei optisch getrennten
+Blöcken: oben „🎮 Spielsteuerung“ mit orangem Rahmen, darunter „🔊 Memes & Sounds“ mit
+blauem Rahmen. Es ist so hoch wie das Fenster; nur die Kacheln scrollen, die
+Spielsteuerung bleibt sichtbar. Ist das Board breit, stehen Kampfzeit und HP links neben
+den Knöpfen. Jeden Knopf gibt es genau einmal in der Bedienung.
+
+**Rechts: Einstellungen**, einklappbar mit ⇥ in der Kopfzeile. Eingeklappt bleibt eine schmale
+Leiste mit ⇤ und senkrechtem „⚙ Einstellungen“ (ein Klick klappt wieder aus); den Platz
+bekommt das Soundboard, das dann mehr Kacheln pro Reihe zeigt. Der Wechsel ist kurz animiert
+und unterbricht weder Wiedergabe noch Spielsteuerung. Der Zustand gilt je Gerät und steht in
+`client.json`. Unter 900 px Fensterbreite stehen beide Bereiche untereinander.
 
 * Alle Knöpfe zeigen nur ein Symbol; die Beschreibung steht im Tooltip beim Überfahren
   (für Screenreader auch als `aria-label`), Tastenkürzel in Klammern. Nur die
@@ -83,8 +90,18 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
     für Schrumpfen).
   * Schalter „Lebensleisten & Timer in der Kampfansicht“: blendet Lebensleisten,
     Kampfzeit und Statuszeilen in der Kampfansicht aus, etwa für Ansagen.
-* **Memes & Sounds**: „⤒ Upload“ und ⏹ Medien stoppen, darunter „＋ Kategorie“ und die
-  Kategorien mit ihren Kacheln.
+  * Schalter „Play intro animation before match“ (an als Vorgabe): aus = „Start“ zeigt
+    gleich den VS-Bildschirm ohne Intro-Video, der Countdown startet weiterhin erst mit dem
+    nächsten „Start“. Gespeichert auf dem Server, gilt ab dem nächsten Kampf.
+* **Memes & Sounds**: Kopfzeile mit „⤒ Upload“, ⏹ Medien stoppen und dem Umschalter ▦
+  Rasteransicht / ☰ Listenansicht (Tooltips erklären beide; gemerkt je Gerät in
+  `client.json`). Darunter „＋ Kategorie“ und die Kategorien mit ihren Kacheln. Erklärtext
+  unter den Kacheln gibt es nicht.
+  * **Raster**: gleich große, kompakte Kacheln mit Symbol und Name; die Spaltenzahl richtet
+    sich nach der tatsächlichen Breite (mindestens 150 px je Kachel).
+  * **Liste**: kompakte Zeilen mit Symbol, Name und „LÄUFT“, solange die Kachel spielt;
+    bei viel Platz mehrere Spalten. Klicken, Umbenennen, Löschen und Ziehen wie im Raster.
+  * Der Wechsel ändert weder Kategorien, Reihenfolge noch Wiedergabe.
 * ⚔ öffnet ein kleines Fenster mit je einem Steckbrief pro Roboter (blau Roboter 1, rot
   Roboter 2): Bild (am besten PNG mit transparentem Hintergrund; ✕ entfernt es), Name, Team,
   Gewicht, Höhe und optional ein Slogan. Gewicht und Höhe sind freier Text („850 g“).
@@ -103,13 +120,19 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
   Netz (auch nicht über Weiterleitungen).
 * Jede Datei wird eine
   Kachel mit dem Dateinamen ohne Endung; „✎“ benennt sie um (Enter oder Klick daneben
-  übernimmt, Esc verwirft), „🗑“ löscht sie nach Rückfrage samt Datei. Neue Kacheln stehen
-  vorne in „Standard“.
-* **Kategorien**: „Standard“ gibt es immer; sie lässt sich weder umbenennen noch löschen
-  oder verschieben. „＋ Kategorie“ legt eine neue an (Name eingeben, Enter). Eigene
-  Kategorien lassen sich umbenennen (✎), mit ▲/▼ verschieben und löschen (🗑, nach
-  Rückfrage); ihre Kacheln wandern dann ans Ende von „Standard“, Dateien bleiben erhalten.
+  übernimmt, Esc verwirft), „🗑“ löscht sie nach Rückfrage samt Datei. ✎ und 🗑 erscheinen
+  erst beim Überfahren oder per Tastatur-Fokus. Neue Kacheln stehen vorne in „Uncategorized“.
+* **Kategorien**: „Standard“ gibt es immer; sie lässt sich weder umbenennen noch löschen,
+  aber wie eigene Kategorien verschieben. „Uncategorized“ steht immer ganz unten und sammelt
+  alle Kacheln ohne Kategorie (neu entdeckte und hochgeladene Dateien); sie lässt sich weder
+  umbenennen, löschen noch verschieben, Kacheln lassen sich aber hinein- und herausziehen.
+  „＋ Kategorie“ legt eine neue an (Name eingeben, Enter), direkt über „Uncategorized“.
+  Eigene Kategorien lassen sich umbenennen (✎) und löschen (🗑, nach Rückfrage); ihre
+  Kacheln wandern dann ans Ende von „Standard“, Dateien bleiben erhalten.
   Namen sind eindeutig (Groß-/Kleinschreibung egal).
+* **Kategorien verschieben**: am Griff ⠿ links im Kategorienkopf ziehen; eine Linie zeigt,
+  wo die Kategorie landet. Alternativ Griff fokussieren und ↑/↓ drücken. Die Reihenfolge der
+  Kacheln in der Kategorie bleibt dabei gleich.
 * **Ziehen und Ablegen**: Kacheln lassen sich innerhalb einer Kategorie und in andere
   Kategorien ziehen; eine Linie zeigt, wo sie landen, die Zielkategorie leuchtet. Ziehen
   spielt nichts ab. Kategorien, Zuordnung und Reihenfolge speichert der Server; sie gelten
@@ -121,10 +144,9 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
     Bühnen zeigen sie an derselben relativen Stelle. Ein zweiter Klick auf dieselbe Kachel
     stoppt nur dieses Medium ganz und nimmt es sofort von allen Bühnen; der nächste Klick
     startet es von vorn an einer neuen Stelle. Läuft ein Medium zu Ende, gilt es ebenfalls
-    als gestoppt. Laufende Kacheln sind grün umrandet („⏹ Läuft – Klick stoppt“). Mehrere
+    als gestoppt. Laufende Kacheln sind grün umrandet und zeigen ⏹ statt ihres Symbols
+    (Tooltip „Läuft – Klick stoppt“). Mehrere
     Medien laufen gleichzeitig; „⏹ Medien stoppen“ beendet alle.
-  * Die Kacheln stehen gleich groß in 3 Spalten, wenn das Board breit genug ist (Bedienung
-    im Vollbild), sonst in 2 Spalten (etwa halber Bildschirm).
   Videos und Ton spielen im App-Fenster mit Ton, ohne dass jemand in die Bühne klickt.
   Fehlt Windows der Dateityp, gilt die Endung (z. B. mkv, mov, m4a); andere Formate und zu
   große Dateien (über 100 MB) meldet die Bedienung.
@@ -133,7 +155,7 @@ Jeden Knopf gibt es genau einmal in der Bedienung.
   sobald die Datei fertig kopiert ist); alle Bedienungen sehen neue Kacheln sofort. Hochgeladene
   Dateien landen ebenfalls dort. Namen, Kategorien und Reihenfolge stehen in
   `data/soundboard.json` und bleiben über Neustarts erhalten, auch umbenannte Namen. Neue
-  Dateien stehen vorne in „Standard“. Wird
+  Dateien stehen vorne in „Uncategorized“. Wird
   `X.mp4` durch `X.webm` ersetzt, behält die Kachel Namen und Platz. Löschen per 🗑 löscht die
   Datei im Ordner; Dateien mit Punkt am Anfang werden ignoriert. Ein altes Soundboard aus
   `data/media/board.json` übernimmt der Server beim ersten Start einmalig in den Ordner.

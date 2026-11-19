@@ -108,7 +108,7 @@ def test_upload_with_green_screen_is_keyed_in_background(tmp_path):
     while library.board()["memes"][0]["processing"] and time.monotonic() < deadline:
         time.sleep(0.2)
     assert library.board()["memes"] == [{"url": "/memes/Gr%C3%BCn.webm", "file": "Grün.webm", "name": "Grün",
-                                         "mime": "video/webm", "category": "standard",
+                                         "mime": "video/webm", "category": "uncategorized",
                                 "cutout": True, "processing": False}]
     assert sorted(p.name for p in (tmp_path / "memes").iterdir()) == ["Grün.webm"]
     assert library.keying == {} and None in changes
@@ -122,7 +122,7 @@ def test_routes_serve_only_known_memes_and_need_moderator(tmp_path):
     (tmp_path / "geheim.txt").write_text("x")
     with TestClient(create_server(app, tmp_path / "data" / "media", lobby, tmp_path / "memes")) as c:
         assert c.get("/media").json()["memes"] == [{"url": "/memes/Meme_001.mp4", "file": "Meme_001.mp4",
-                                                     "name": "Meme 001", "category": "standard",
+                                                     "name": "Meme 001", "category": "uncategorized",
                                             "mime": "video/mp4", "cutout": False, "processing": False}]
         r = c.get("/memes/Meme_001.mp4")
         assert r.status_code == 200 and r.content == b"video" and r.headers["content-type"] == "video/mp4"
@@ -156,14 +156,15 @@ def test_categories_keep_standard_and_move_tiles_back_on_delete(tmp_path):
     assert library.move("c.mp3", fun["id"], 0) and library.move("a.mp3", fun["id"], 0)
     assert not library.move("b.mp3", "gibtsnicht", 0)
     library.rename_category(loud["id"], "Sehr laut")
-    library.move_category(loud["id"], 0)
+    library.move_category(loud["id"], 1)
     again = lib(tmp_path)
-    assert [c["name"] for c in again.board()["categories"]] == ["Standard", "Sehr laut", "Lustig"]
+    assert [c["name"] for c in again.board()["categories"]] == [
+        "Standard", "Sehr laut", "Lustig", "Uncategorized"]
     assert [(m["file"], m["category"]) for m in again.board()["memes"]] == [
-        ("b.mp3", "standard"), ("a.mp3", fun["id"]), ("c.mp3", fun["id"])]
+        ("b.mp3", "uncategorized"), ("a.mp3", fun["id"]), ("c.mp3", fun["id"])]
     again.delete_category(fun["id"])
     assert [(m["file"], m["category"]) for m in lib(tmp_path).board()["memes"]] == [
-        ("b.mp3", "standard"), ("a.mp3", "standard"), ("c.mp3", "standard")]
+        ("b.mp3", "uncategorized"), ("a.mp3", "standard"), ("c.mp3", "standard")]
 
 
 def test_move_places_tile_exactly_within_category(tmp_path):
@@ -172,8 +173,8 @@ def test_move_places_tile_exactly_within_category(tmp_path):
     for f in ("a.mp3", "b.mp3", "c.mp3", "d.mp3"):
         (folder / f).write_bytes(b"x")
     library = lib(tmp_path)
-    library.move("d.mp3", "standard", 1)
-    library.move("a.mp3", "standard", 99)
+    library.move("d.mp3", "uncategorized", 1)
+    library.move("a.mp3", "uncategorized", 99)
     assert [m["file"] for m in lib(tmp_path).board()["memes"]] == ["d.mp3", "b.mp3", "c.mp3", "a.mp3"]
 
 
@@ -184,8 +185,43 @@ def test_old_list_index_becomes_standard(tmp_path):
     old = [{"file": "a.mp3", "name": "Alt", "mime": "audio/mpeg"}]
     (tmp_path / "soundboard.json").write_text(json.dumps(old))
     board = lib(tmp_path).board()
-    assert board["categories"] == [{"id": "standard", "name": "Standard"}]
+    assert board["categories"] == [{"id": "standard", "name": "Standard"},
+                                   {"id": "uncategorized", "name": "Uncategorized"}]
     assert [(m["name"], m["category"]) for m in board["memes"]] == [("Alt", "standard")]
+
+
+def test_existing_index_keeps_assignments_and_uncategorized_stays_last(tmp_path):
+    folder = tmp_path / "memes"
+    folder.mkdir()
+    for f in ("a.mp3", "b.mp3", "c.mp3"):
+        (folder / f).write_bytes(b"x")
+    # Format vor „Uncategorized“: „Standard“ wurde nicht mitgespeichert.
+    old = {"categories": [{"id": "fav", "name": "Fav"}],
+           "entries": [{"file": "a.mp3", "name": "Eigener Name", "mime": "audio/mpeg",
+                        "category": "standard"},
+                       {"file": "b.mp3", "name": "B", "mime": "audio/mpeg", "category": "fav"}]}
+    (tmp_path / "soundboard.json").write_text(json.dumps(old))
+    board = lib(tmp_path).board()
+    assert [c["id"] for c in board["categories"]] == ["standard", "fav", "uncategorized"]
+    assert [(m["file"], m["name"], m["category"]) for m in board["memes"]] == [
+        ("c.mp3", "c", "uncategorized"), ("a.mp3", "Eigener Name", "standard"), ("b.mp3", "B", "fav")]
+
+    library = lib(tmp_path)
+    library.move_category("standard", 99)
+    library.move_category("fav", 0)
+    with pytest.raises(MediaError):
+        library.move_category("uncategorized", 0)
+    with pytest.raises(MediaError):
+        library.rename_category("uncategorized", "X")
+    with pytest.raises(MediaError):
+        library.delete_category("uncategorized")
+    assert library.move("a.mp3", "uncategorized", 0)
+    assert not any(c["id"] == "uncategorized"
+                   for c in json.loads((tmp_path / "soundboard.json").read_text("utf-8"))["categories"])
+    again = lib(tmp_path).board()
+    assert [c["id"] for c in again["categories"]] == ["fav", "standard", "uncategorized"]
+    assert {m["file"]: m["category"] for m in again["memes"]} == {
+        "a.mp3": "uncategorized", "b.mp3": "fav", "c.mp3": "uncategorized"}
 
 
 def test_upload_checks_content_not_just_header(tmp_path):

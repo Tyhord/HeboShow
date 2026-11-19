@@ -215,11 +215,44 @@ def login(server: str, server_id: str, cfg: dict) -> dict:
 
 class Handler(SimpleHTTPRequestHandler):
     extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".js": "text/javascript"}
+    # Das Webfenster läuft privat auf wechselndem Port, localStorage überlebt keinen Neustart.
+    prefs_lock = threading.Lock()
 
     def end_headers(self):
         # Nach einem Update sollen alle Geräte sofort die neuen Seiten laden, nicht einen alten Stand.
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
+
+    def send_json(self, code: int, data: dict) -> None:
+        body = json.dumps(data).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path == "/prefs":
+            self.send_json(200, load_config().get("view", {}))
+        else:
+            super().do_GET()
+
+    def do_POST(self):
+        if self.path != "/prefs":
+            self.send_error(404)
+            return
+        try:
+            data = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+        except ValueError:
+            data = None
+        if not isinstance(data, dict):
+            self.send_json(400, {"message": "Erwartet ein JSON-Objekt."})
+            return
+        with self.prefs_lock:
+            cfg = load_config()
+            cfg["view"] = {**cfg.get("view", {}), **data}
+            save_config(cfg)
+        self.send_json(200, cfg["view"])
 
     def log_message(self, format, *args):
         pass
