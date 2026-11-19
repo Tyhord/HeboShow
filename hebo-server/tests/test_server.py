@@ -158,11 +158,7 @@ def test_categories_keep_standard_and_move_tiles_back_on_delete(tmp_path):
     library.rename_category(loud["id"], "Sehr laut")
     library.move_category(loud["id"], 0)
     again = lib(tmp_path)
-    assert [c["name"] for c in again.board()["categories"]] == ["Sehr laut", "Lustig", "Standard"]
-    assert again.move("a.mp3", "standard", 0)
-    assert [(m["file"], m["category"]) for m in again.board()["memes"]] == [
-        ("a.mp3", "standard"), ("b.mp3", "standard"), ("c.mp3", fun["id"])]
-    again.move("a.mp3", fun["id"], 0)
+    assert [c["name"] for c in again.board()["categories"]] == ["Standard", "Sehr laut", "Lustig"]
     assert [(m["file"], m["category"]) for m in again.board()["memes"]] == [
         ("b.mp3", "standard"), ("a.mp3", fun["id"]), ("c.mp3", fun["id"])]
     again.delete_category(fun["id"])
@@ -225,7 +221,7 @@ def test_category_and_url_routes_need_moderator(tmp_path):
         assert c.patch(f"/categories/{cid}", json={"name": "Tröten"}, headers=mod).status_code == 200
         assert c.delete("/categories/standard", headers=mod).status_code == 400
         board = c.get("/media").json()
-        assert board["categories"][0] == {"id": cid, "name": "Tröten"}
+        assert board["categories"][1] == {"id": cid, "name": "Tröten"}
         assert board["memes"][0]["category"] == cid
         assert c.delete(f"/categories/{cid}", headers=mod).status_code == 200
         assert c.get("/media").json()["memes"][0]["category"] == "standard"

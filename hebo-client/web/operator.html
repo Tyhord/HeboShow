@@ -18,9 +18,6 @@
 
   .dashboard-shell { display: grid; grid-template-columns: minmax(310px, .92fr) minmax(480px, 1.35fr); gap: 20px; min-height: 100dvh;
     padding: 22px; max-width: 1700px; margin: auto; }
-  /* Erst nach dem Laden der Ansicht animieren, sonst klappt die Leiste beim Start sichtbar zu. */
-  .dashboard-shell.animate { transition: grid-template-columns .3s ease; }
-  .dashboard-shell.settings-collapsed { grid-template-columns: minmax(310px, .92fr) minmax(64px, 0fr); }
   .dashboard-heading { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
   .dashboard-heading h1 { margin: 0; font-size: clamp(24px, 2.5vw, 35px); letter-spacing: .025em; }
   .dashboard-heading p { margin: 5px 0 0; font-size: 15px; color: #bfcfe0; }
@@ -73,23 +70,12 @@
   .sound-actions .upload-button:hover { background: #c46400; }
   .board-tile.is-processing { border: 2px dashed #58a6ff; cursor: progress; opacity: .8; }
   .board-tile.is-processing small { color: #a5d6ff; font-weight: 700; }
-  .view-toggle { margin-left: auto; display: inline-flex; border: 1px solid #ffffff55; border-radius: 12px; overflow: hidden; }
-  .sound-actions .view-toggle button { min-height: 43px; width: 48px; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 20px; }
-  .view-toggle button + button { border-left: 1px solid #ffffff33; }
-  .sound-actions .view-toggle button[aria-pressed="true"] { background: #f3920033; color: #ffd194; }
-  /* Spalten nach der echten Breite statt fester Zahl: halber Bildschirm 2, Vollbild 3, eingeklappte Einstellungen deutlich mehr. */
-  .board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(160px, calc(50% - 6px)), 1fr)); grid-auto-rows: 118px;
-    gap: 12px; border-radius: 14px; }
+  .board-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 118px; gap: 12px; border-radius: 14px; }
+  /* Spaltenzahl nach der echten Breite des Soundboards statt des Fensters: Vollbild 3, halber Bildschirm 2. */
+  .media-section { container: board / inline-size; }
+  @container board (min-width: 440px) { .board-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .board-cats { flex: 0 1 auto; min-height: 130px; overflow-y: auto; overscroll-behavior: contain; padding: 2px 4px 2px 2px;
     display: flex; flex-direction: column; gap: 16px; }
-  .board-cat { position: relative; }
-  .board-cat.dragging { opacity: .4; }
-  .board-cat.drop-before::before, .board-cat.drop-after::after { content: ""; position: absolute; left: 0; right: 0; height: 4px;
-    border-radius: 2px; background: #f39200; box-shadow: 0 0 8px #f39200; }
-  .board-cat.drop-before::before { top: -10px; }
-  .board-cat.drop-after::after { bottom: -10px; }
-  .cat-head .cat-grip { cursor: grab; background: transparent; border-color: transparent; font-size: 18px; color: #9fd4ff; }
-  .cat-head .cat-grip:active { cursor: grabbing; }
   .cat-add { display: flex; gap: 8px; align-items: center; }
   .cat-add button { min-height: 38px; padding: 6px 14px; font-size: 14px; font-weight: 700; border-style: dashed; background: transparent; }
   .cat-add:has(input) button { display: none; }
@@ -128,19 +114,6 @@
   .tile-remove { top: 46px; }
   /*noinspection CssUnusedSymbol*/
   .tile-name-edit { position: absolute; left: 10px; right: 10px; bottom: 10px; font-size: 15px; }
-  #board.is-list .board-grid { grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); grid-auto-rows: 48px; gap: 6px 12px; }
-  #board.is-list .board-tile { flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; padding: 6px 84px 6px 12px;
-    border-radius: 10px; }
-  #board.is-list .board-tile .tile-symbol { font-size: 18px; }
-  #board.is-list .board-tile strong { flex: 1; min-width: 0; font-size: 15px; -webkit-line-clamp: 1; }
-  #board.is-list .board-tile small { flex: none; max-width: 45%; font-size: 12px; }
-  #board.is-list .tile-rename { top: 8px; right: 44px; }
-  #board.is-list .tile-remove { right: 8px; }
-  #board.is-list .tile-name-edit { top: 6px; bottom: 6px; left: 40px; right: 84px; }
-  #board.is-list .tile-wrap.drop-before::before, #board.is-list .tile-wrap.drop-after::after { left: 4px; right: 4px; top: auto; bottom: auto;
-    width: auto; height: 4px; }
-  #board.is-list .tile-wrap.drop-before::before { top: -5px; }
-  #board.is-list .tile-wrap.drop-after::after { bottom: -5px; }
   .board-footer { flex: none; margin-top: 12px; padding: 13px; border-radius: 12px; background: #0a1322; border: 1px solid #43546b; color: #dce7f5;
     font-size: 14px; line-height: 1.5; }
 
@@ -148,18 +121,6 @@
   .panel { display: flex; flex-direction: column; height: 100%; }
   .panel h2 { flex: none; margin: 0; padding: 23px 24px 17px; border-bottom: 1px solid #ffffff1c; font-size: 20px; font-weight: 900;
     letter-spacing: .045em; line-height: 1.4; text-transform: uppercase; color: #f7f9ff; }
-  .dashboard-settings h2 { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 17px; }
-  .settings-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .settings-toggle { flex: none; width: 42px; height: 42px; padding: 0; border-radius: 10px; font-size: 22px; line-height: 1; }
-  .settings-collapsed .settings-layout { display: none; }
-  .settings-collapsed .dashboard-settings { cursor: pointer; }
-  .settings-collapsed .dashboard-settings:hover { border-color: #f39200; }
-  .settings-collapsed .dashboard-settings h2 { flex: 1; flex-direction: column; justify-content: flex-start; padding: 11px 0; border-bottom: 0; }
-  .settings-collapsed .settings-title { writing-mode: vertical-rl; font-size: 16px; }
-  /* Eingeklappt ist das Meldungsfeld weg; Fehler und Hinweise erscheinen dann kurz unten als Einblendung. */
-  .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 20; max-width: min(640px, 92vw); margin: 0;
-    padding: 12px 16px; background: #101e31; border: 1px solid #526276; border-left: 3px solid #f39200; border-radius: 10px;
-    box-shadow: 0 10px 30px #000b; font-size: 15px; line-height: 1.5; }
   .settings-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 165px minmax(0, 1fr); overflow: hidden; }
   .settings-tabs { padding: 14px 9px; border-right: 1px solid #ffffff1c; display: flex; flex-direction: column; gap: 4px;
     background: #060b1555; overflow-y: auto; min-height: 0; }
@@ -253,10 +214,7 @@
   .vs-frame iframe { width: 1280px; height: 720px; border: 0; transform: scale(.5); transform-origin: 0 0; pointer-events: none; }
   [hidden] { display: none !important; }
   @media (max-width: 900px) {
-    .dashboard-shell, .dashboard-shell.settings-collapsed { grid-template-columns: 1fr; padding: 14px; }
-    .settings-collapsed .dashboard-settings { height: auto; }
-    .settings-collapsed .dashboard-settings h2 { flex-direction: row; justify-content: space-between; padding: 11px 24px; }
-    .settings-collapsed .settings-title { writing-mode: horizontal-tb; }
+    .dashboard-shell { grid-template-columns: 1fr; padding: 14px; }
     .soundboard, .dashboard-settings { position: static; }
     .soundboard { max-height: none; overflow: visible; }
     .board-cats { overflow: visible; }
@@ -279,7 +237,6 @@
       <a class="view-switch" id="stageLink" href="stage.html" target="_blank" rel="noopener">↗ Kampfansicht öffnen</a>
     </div>
   </header>
-  <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
 
   <section class="soundboard dashboard-panel" aria-label="Spielsteuerung und Meme- &amp; Soundboard">
     <h2>🎛️ Meme- &amp; Soundboard</h2>
@@ -326,10 +283,6 @@
       <div class="sound-actions">
         <button id="uploadOpen" type="button" class="upload-button" title="Datei oder URL ins Soundboard holen">⤒ Upload</button>
         <button id="stopMedia" type="button" class="icon" title="Alle Medien stoppen">⏹</button>
-        <div class="view-toggle" role="group" aria-label="Ansicht des Soundboards">
-          <button id="viewGrid" type="button" aria-pressed="true" title="Rasteransicht: kompakte Kacheln, so viele Spalten wie Platz ist">▦</button>
-          <button id="viewList" type="button" aria-pressed="false" title="Listenansicht: eine Zeile pro Eintrag mit Name und Abspielstatus">☰</button>
-        </div>
       </div>
       <div id="board" class="board-cats">
         <div class="cat-add" id="catAdd"><button id="addCategory" type="button" title="Neue Kategorie anlegen">＋ Kategorie</button></div>
@@ -338,15 +291,14 @@
         <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erster Sound</strong><small>Über „Upload“ hinzufügen</small></div>
         <div class="board-tile is-empty"><span class="tile-symbol">＋</span><strong>Dein erstes Meme</strong><small>Bild oder Video hochladen</small></div>
       </template>
-      <div class="board-footer">Alle Dateien im Ordner <code>memes/</code> des Servers erscheinen hier von selbst und bleiben nach einem Neustart erhalten. Ein Klick startet, ein zweiter stoppt. Kacheln per Ziehen sortieren oder in eine andere Kategorie schieben, Kategorien am Griff ⠿ verschieben; was keiner Kategorie gehört, steht unten in „Standard“. ✎ benennt um, 🗑 löscht.</div>
+      <div class="board-footer">Alle Dateien im Ordner <code>memes/</code> des Servers erscheinen hier von selbst und bleiben nach einem Neustart erhalten. Ein Klick startet, ein zweiter stoppt. Kacheln per Ziehen sortieren oder in eine andere Kategorie schieben; ✎ benennt um, 🗑 löscht.</div>
     </section>
   </section>
 
-  <section class="dashboard-settings dashboard-panel" id="settingsPanel" aria-label="Einstellungen">
+  <section class="dashboard-settings dashboard-panel" aria-label="Einstellungen">
     <div class="panel">
-      <h2><span class="settings-title">⚙ Einstellungen</span><button id="settingsToggle" type="button" class="settings-toggle"
-        aria-expanded="true" aria-controls="settingsBody" title="Einstellungen einklappen, das Soundboard bekommt den Platz">»</button></h2>
-      <div class="settings-layout" id="settingsBody">
+      <h2>⚙ Einstellungen</h2>
+      <div class="settings-layout">
         <nav class="settings-tabs" id="tabs" aria-label="Einstellungsbereiche">
           <button data-tab="kamera">📷 Kamera</button>
           <button data-tab="spielfeld">🔳 Spielfeld</button>
@@ -490,7 +442,7 @@ const LIVE = ["intro", "ready", "countdown", "fight", "finished"];
 
 async function run(name, data) {
   const res = await act(name, data);
-  if (!res.ok) say(res.message);
+  if (!res.ok) byId("message").textContent = res.message;
 }
 
 const names = () => [byId("name1").value, byId("name2").value];
@@ -680,55 +632,7 @@ byId("vsPreview").onclose = () => { byId("vsFrame").src = "about:blank"; };
 for (const d of document.querySelectorAll("dialog")) d.addEventListener("keydown", (e) => e.stopPropagation());
 
 let lastServerText = "";
-const shell = document.querySelector(".dashboard-shell");
-let toastTimer = 0;
-function say(text) {
-  byId("message").textContent = text;
-  // Eingeklappt ist das Meldungsfeld unsichtbar, Fehler sollen trotzdem ankommen.
-  const toast = byId("toast");
-  toast.textContent = text;
-  toast.hidden = !text || !shell.classList.contains("settings-collapsed");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.hidden = true; }, 5000);
-}
-
-// Ansicht gehört zum Gerät: der Client speichert sie in client.json, der Spielserver erfährt davon nichts.
-function savePref(data) {
-  fetch("/prefs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).catch(() => {});
-}
-
-function setCollapsed(on, save = true) {
-  shell.classList.toggle("settings-collapsed", on);
-  const t = byId("settingsToggle");
-  t.textContent = on ? "«" : "»";
-  t.setAttribute("aria-expanded", String(!on));
-  tip(t, on ? "Einstellungen ausklappen" : "Einstellungen einklappen, das Soundboard bekommt den Platz");
-  if (!on) byId("toast").hidden = true;
-  if (save) savePref({ settings_collapsed: on });
-  // Die Vorschau hat ausgeklappt plötzlich wieder Platz; ohne neues Zeichnen bliebe sie leer bis zum nächsten Bild.
-  requestAnimationFrame(draw);
-}
-
-function setView(list, save = true) {
-  board.classList.toggle("is-list", list);
-  byId("viewGrid").setAttribute("aria-pressed", String(!list));
-  byId("viewList").setAttribute("aria-pressed", String(list));
-  if (save) savePref({ board_view: list ? "list" : "grid" });
-}
-
-byId("settingsToggle").onclick = (e) => {
-  e.stopPropagation();
-  setCollapsed(!shell.classList.contains("settings-collapsed"));
-};
-// Die schmale Leiste ist als Ganzes ein Ausklapp-Knopf, so muss niemand den kleinen Pfeil treffen.
-byId("settingsPanel").onclick = () => { if (shell.classList.contains("settings-collapsed")) setCollapsed(false); };
-byId("viewGrid").onclick = () => setView(false);
-byId("viewList").onclick = () => setView(true);
-fetch("/prefs").then((r) => r.json()).catch(() => ({})).then((p) => {
-  setCollapsed(Boolean(p.settings_collapsed), false);
-  setView(p.board_view === "list", false);
-  requestAnimationFrame(() => shell.classList.add("animate"));
-});
+const say = (text) => { byId("message").textContent = text; };
 const mimeOf = (name, type = "") => type || MIME[name.split(/[?#]/)[0].split(".").pop().toLowerCase()] || "";
 
 async function send(path, method, body) {
@@ -911,7 +815,6 @@ const EMPTY_TILES = [...byId("emptyTiles").content.children].map((n) => n.cloneN
 const board = byId("board");
 let categories = [];
 let dragged = null;
-let draggedCat = null;
 
 function updateTiles(memes = [], keying = {}) {
   const running = new Set(memes.map((m) => m.media.url));
@@ -977,7 +880,7 @@ function addTile(media) {
 }
 
 function addSection(c) {
-  const s = { id: c.id, section: document.createElement("section"), head: document.createElement("div"),
+  const s = { section: document.createElement("section"), head: document.createElement("div"),
     title: document.createElement("strong"), grid: document.createElement("div"), drop: document.createElement("div"), buttons: {} };
   s.section.className = "board-cat";
   s.head.className = "cat-head";
@@ -986,42 +889,18 @@ function addSection(c) {
   s.drop.className = "cat-drop";
   s.drop.textContent = "Leer – Kacheln hierher ziehen";
   s.head.append(s.title);
-  // „Standard“ sammelt alles ohne eigene Kategorie, steht deshalb fest unten und lässt sich nicht löschen.
+  // „Standard“ bleibt fest oben und nimmt die Kacheln gelöschter Kategorien auf.
   if (c.id !== "standard") {
     const path = `/categories/${c.id}`;
-    const move = async (step) => {
-      const index = categories.findIndex((x) => x.id === c.id) + step;
-      if (index < 0 || index >= categories.length - 1) return;
-      await change(path, "PATCH", { index });
-      s.buttons.grip.focus();
-    };
-    s.buttons.grip = smallButton("⠿", "Kategorie verschieben: ziehen oder Pfeiltasten ↑ ↓", null, "cat-grip");
-    s.buttons.grip.draggable = true;
-    s.buttons.grip.onkeydown = (e) => {
-      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-      e.preventDefault();
-      e.stopPropagation();
-      move(e.key === "ArrowUp" ? -1 : 1);
-    };
-    s.buttons.grip.ondragstart = (e) => {
-      draggedCat = s;
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", s.name);
-      e.dataTransfer.setDragImage(s.section, 24, 20);
-      s.section.classList.add("dragging");
-    };
-    s.buttons.grip.ondragend = () => {
-      s.section.classList.remove("dragging");
-      draggedCat = null;
-      clearDrop();
-    };
+    const move = (step) => change(path, "PATCH", { index: categories.findIndex((x) => x.id === c.id) - 1 + step });
     s.buttons.rename = smallButton("✎", "Kategorie umbenennen",
       () => inlineEdit(s.head, s.name, (name) => change(path, "PATCH", { name }), "cat-name-edit"));
+    s.buttons.up = smallButton("▲", "Kategorie nach oben", () => move(-1));
+    s.buttons.down = smallButton("▼", "Kategorie nach unten", () => move(1));
     s.buttons.remove = smallButton("🗑", "Kategorie löschen", () => {
       if (confirm(`Kategorie „${s.name}“ löschen? Ihre Kacheln wandern nach „Standard“.`)) change(path, "DELETE");
     });
-    s.head.prepend(s.buttons.grip);
-    s.head.append(s.buttons.rename, s.buttons.remove);
+    s.head.append(...Object.values(s.buttons));
   }
   s.section.append(s.head, s.grid);
   sections.set(c.id, s);
@@ -1066,18 +945,20 @@ async function loadBoard() {
     (byCat.get(m.category) || byCat.get("standard")).push(wrap);
   }
   for (const id of [...sections.keys()]) if (!byCat.has(id)) sections.delete(id);
-  const nodes = categories.map((c) => {
+  const nodes = categories.map((c, i) => {
     const s = sections.get(c.id) || addSection(c);
     s.name = c.name;
     s.title.textContent = c.name;
-    s.title.title = c.id === "standard" ? `${c.name}: alles ohne eigene Kategorie, steht immer ganz unten` : c.name;
+    s.title.title = c.name;
+    if (s.buttons.up) {
+      s.buttons.up.disabled = i <= 1;
+      s.buttons.down.disabled = i === categories.length - 1;
+    }
     const items = byCat.get(c.id);
     setChildren(s.grid, items.length ? items : !list.length && c.id === "standard" ? EMPTY_TILES : [s.drop]);
     return s.section;
   });
-  // Neue Kategorien landen direkt über „Standard“, also genau dort, wo der Knopf steht.
-  nodes.splice(nodes.length - 1, 0, byId("catAdd"));
-  setChildren(board, nodes);
+  setChildren(board, [byId("catAdd"), ...nodes]);
   updateTiles(state?.memes, state?.board?.keying);
   return list;
 }
@@ -1120,28 +1001,14 @@ byId("addCategory").onclick = () => {
   if (input) input.placeholder = "Name der neuen Kategorie";
 };
 
-// Erste Kachel, vor der der Zeiger in Leserichtung steht; dort landet die gezogene Kachel.
-// In der Liste entscheidet die Zeilenhälfte, im Raster die Spaltenhälfte.
+// Erste Kachel, vor deren Mitte der Zeiger in Leserichtung steht; dort landet die gezogene Kachel.
 function dropSpot(grid, e) {
-  const list = board.classList.contains("is-list");
   const items = [...grid.querySelectorAll(":scope > .tile-wrap")].filter((w) => w !== dragged);
   const index = items.findIndex((w) => {
     const r = w.getBoundingClientRect();
-    if (e.clientY < r.top) return true;
-    if (e.clientY > r.bottom) return false;
-    return list && e.clientX >= r.left && e.clientX <= r.right ? e.clientY < r.top + r.height / 2 : e.clientX < r.left + r.width / 2;
+    return e.clientY < r.top || (e.clientY <= r.bottom && e.clientX < r.left + r.width / 2);
   });
   return { items, index: index < 0 ? items.length : index };
-}
-
-// Index zählt nur eigene Kategorien ohne die gezogene; „Standard“ bleibt immer dahinter.
-function catSpot(e) {
-  const others = categories.filter((c) => c.id !== "standard" && c.id !== draggedCat.id).map((c) => sections.get(c.id));
-  const index = others.findIndex((s) => {
-    const r = s.section.getBoundingClientRect();
-    return e.clientY < r.top + r.height / 2;
-  });
-  return { others, index: index < 0 ? others.length : index };
 }
 
 function clearDrop() {
@@ -1150,15 +1017,6 @@ function clearDrop() {
 }
 
 board.addEventListener("dragover", (e) => {
-  if (draggedCat) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    const { others, index } = catSpot(e);
-    clearDrop();
-    if (index < others.length) others[index].section.classList.add("drop-before");
-    else if (others.length) others[others.length - 1].section.classList.add("drop-after");
-    return;
-  }
   const grid = e.target.closest?.(".board-grid");
   if (!dragged || !grid) return;
   e.preventDefault();
@@ -1171,15 +1029,6 @@ board.addEventListener("dragover", (e) => {
 });
 board.addEventListener("dragleave", (e) => { if (!board.contains(e.relatedTarget)) clearDrop(); });
 board.addEventListener("drop", async (e) => {
-  if (draggedCat) {
-    e.preventDefault();
-    const s = draggedCat;
-    const { others, index } = catSpot(e);
-    clearDrop();
-    board.insertBefore(s.section, others[index]?.section || byId("catAdd"));
-    await change(`/categories/${s.id}`, "PATCH", { index });
-    return;
-  }
   const grid = e.target.closest?.(".board-grid");
   if (!dragged || !grid) return;
   e.preventDefault();
@@ -1243,7 +1092,7 @@ function ui(s) {
     ? `Ecke ${corners.length + 1} von 4 im Bild anklicken (Esc fängt neu an).`
     : (s.busy ? `⏳ ${s.busy} … ` : "") + (s.message || "");
   // Nur bei neuem Servertext schreiben, sonst löscht jedes Zustandspaket lokale Fehlermeldungen sofort.
-  if (serverText !== lastServerText) say(lastServerText = serverText);
+  if (serverText !== lastServerText) byId("message").textContent = lastServerText = serverText;
   const cam = s.camera.error ? `<span class="bad">${s.camera.error}</span>` : `Kamera ${s.camera.source}`;
   const tracking = s.tracking.fps ? `Tracking: ${s.tracking.fps} Bilder/s, ${s.tracking.latency_ms} ms Verzögerung` : "Tracking: aus";
   const trackError = s.tracking.error ? `<br><span class="bad">${s.tracking.error}</span>` : "";
